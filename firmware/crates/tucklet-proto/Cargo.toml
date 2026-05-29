@@ -1,0 +1,18 @@
+[package]
+name = "tucklet-proto"
+version = "0.1.0"
+edition = "2021"
+description = "Shared wire protocol + data types for the Tucklet device, firmware, and companion apps."
+license-file = "../../../LICENSE-SOFTWARE.txt"
+
+[dependencies]
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+
+[dev-dependencies]
+serde_json = "1"
+
+[features]
+default = ["std"]
+# `std` enables std-only conveniences. The crate is otherwise no_std + alloc so it
+# can be shared with no_std firmware builds if ever needed.
+std = ["serde/std"]

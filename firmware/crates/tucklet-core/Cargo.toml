@@ -1,0 +1,13 @@
+[package]
+name = "tucklet-core"
+version = "0.1.0"
+edition = "2021"
+description = "Hardware-independent device logic for Tucklet: transfer estimator, state machine, trickle scheduler, temporary-expiry, allow-list, variant resolution."
+license-file = "../../../LICENSE-SOFTWARE.txt"
+
+[dependencies]
+tucklet-proto = { path = "../tucklet-proto", default-features = false }
+
+[features]
+default = ["std"]
+std = ["tucklet-proto/std"]

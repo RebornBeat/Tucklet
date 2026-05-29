@@ -1,0 +1,67 @@
+# Tucklet iOS — XcodeGen project definition.
+# Generate the .xcodeproj with:  xcodegen generate   (brew install xcodegen)
+# License: PolyForm Noncommercial 1.0.0 (see /LICENSE-SOFTWARE.txt)
+
+name: Tucklet
+options:
+  bundleIdPrefix: app.tucklet
+  deploymentTarget:
+    iOS: "26.0"          # WiFiAware framework requires iOS 26+; AccessorySetupKit 18+
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: YES
+    TARGETED_DEVICE_FAMILY: "1,2"   # iPhone + iPad
+
+targets:
+  Tucklet:
+    type: application
+    platform: iOS
+    sources:
+      - path: Tucklet
+    dependencies:
+      - target: TuckletFileProvider
+    settings:
+      base:
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Tucklet
+        # Usage strings (required or the app is rejected):
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "Tucklet connects to your charm over Bluetooth to check battery and start transfers."
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "Tucklet moves your photos over a private local Wi-Fi link to your charm."
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Tucklet backs up and restores your photos and videos."
+      configs:
+        debug: {}
+        release: {}
+    entitlements:
+      path: Tucklet/Tucklet.entitlements
+      properties:
+        com.apple.developer.networking.wifi-info: true
+        com.apple.developer.networking.HotspotConfiguration: true
+        # Wi-Fi Aware + AccessorySetupKit entitlements — CONFIRM exact keys
+        # against the iOS 26 SDK / your provisioning profile before archiving:
+        com.apple.developer.wifi-aware: true
+        com.apple.developer.accessory-setup-kit: true
+    info:
+      properties:
+        # AccessorySetupKit accessory descriptors and Wi-Fi Aware service names
+        # are declared here in production — CONFIRM the Info.plist keys against
+        # the iOS 26 SDK docs.
+        NSAccessorySetupKitSupports: ["Bluetooth", "WiFiAware"]
+
+  TuckletFileProvider:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: TuckletFileProvider
+      - path: Tucklet/Models     # share the protocol model types
+    settings:
+      base:
+        INFOPLIST_KEY_NSExtension__NSExtensionPointIdentifier: com.apple.fileprovider-nonui
+    entitlements:
+      path: TuckletFileProvider/TuckletFileProvider.entitlements
+      properties:
+        com.apple.security.application-groups: ["group.app.tucklet.shared"]

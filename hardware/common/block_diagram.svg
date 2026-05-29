@@ -1,0 +1,86 @@
+<svg viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf7f1"/><stop offset="1" stop-color="#f4ece1"/>
+    </linearGradient>
+    <filter id="s2" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#7a5a48" flood-opacity="0.16"/>
+    </filter>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#7a5a48"/>
+    </marker>
+  </defs>
+  <rect width="900" height="560" fill="url(#bg2)"/>
+  <text x="40" y="46" font-size="24" font-weight="bold" fill="#3a2c23" font-family="Georgia, serif">Tucklet — hardware block diagram</text>
+  <text x="40" y="70" font-size="13" fill="#8a7464">Power (green) · data (charcoal) · the storage bus is shared between the radio and the wired bridge by an arbiter.</text>
+
+  <!-- USB-C -->
+  <g filter="url(#s2)"><rect x="40" y="110" width="130" height="64" rx="12" fill="#fff"/></g>
+  <text x="105" y="138" text-anchor="middle" font-size="14" font-weight="bold" fill="#3a2c23">USB-C (J1)</text>
+  <text x="105" y="158" text-anchor="middle" font-size="11" fill="#6f5b4c">charge + data + CC</text>
+
+  <!-- Charger -->
+  <g filter="url(#s2)"><rect x="40" y="210" width="130" height="60" rx="12" fill="#fff"/></g>
+  <text x="105" y="236" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">Charger (U3)</text>
+  <text x="105" y="255" text-anchor="middle" font-size="11" fill="#6f5b4c">MCP73831</text>
+
+  <!-- Battery + gauge -->
+  <g filter="url(#s2)"><rect x="40" y="306" width="130" height="60" rx="12" fill="#fff"/></g>
+  <text x="105" y="330" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">LiPo (BT1)</text>
+  <text x="105" y="349" text-anchor="middle" font-size="11" fill="#6f5b4c">+ gauge U4 (I2C)</text>
+
+  <!-- Buck -->
+  <g filter="url(#s2)"><rect x="40" y="402" width="130" height="56" rx="12" fill="#fff"/></g>
+  <text x="105" y="426" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">Buck 3V3 (U5)</text>
+  <text x="105" y="444" text-anchor="middle" font-size="11" fill="#6f5b4c">sized for WiFi peak</text>
+
+  <!-- Radio -->
+  <g filter="url(#s2)"><rect x="330" y="110" width="200" height="96" rx="14" fill="#fff"/></g>
+  <text x="430" y="140" text-anchor="middle" font-size="15" font-weight="bold" fill="#3a2c23">ESP32-C5 (U1)</text>
+  <text x="430" y="162" text-anchor="middle" font-size="11" fill="#6f5b4c">BLE control + WiFi 5GHz/Aware</text>
+  <text x="430" y="180" text-anchor="middle" font-size="11" fill="#6f5b4c">SDIO master · I2C · GPIO</text>
+  <text x="430" y="198" text-anchor="middle" font-size="10.5" fill="#b5654f" font-style="italic">DualC5: +U1b + agg link</text>
+
+  <!-- Arbiter -->
+  <g filter="url(#s2)"><rect x="360" y="262" width="140" height="60" rx="12" fill="#fff"/></g>
+  <text x="430" y="286" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">SD arbiter (U6)</text>
+  <text x="430" y="305" text-anchor="middle" font-size="11" fill="#6f5b4c">radio ⟷ bridge</text>
+
+  <!-- Storage -->
+  <g filter="url(#s2)"><rect x="330" y="378" width="200" height="80" rx="12" fill="#fff"/></g>
+  <text x="430" y="406" text-anchor="middle" font-size="14" font-weight="bold" fill="#3a2c23">Storage</text>
+  <text x="430" y="426" text-anchor="middle" font-size="11" fill="#6f5b4c">microSD (J2)  —or—  eMMC (XU7)</text>
+  <text x="430" y="444" text-anchor="middle" font-size="11" fill="#6f5b4c">SDIO 4-bit (eMMC opt. 8-bit)</text>
+
+  <!-- Bridge -->
+  <g filter="url(#s2)"><rect x="690" y="262" width="170" height="60" rx="12" fill="#fff"/></g>
+  <text x="775" y="286" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">USB-HS bridge (U2)</text>
+  <text x="775" y="305" text-anchor="middle" font-size="11" fill="#6f5b4c">~20–40 MB/s wired</text>
+
+  <!-- UI -->
+  <g filter="url(#s2)"><rect x="690" y="110" width="170" height="96" rx="14" fill="#fff"/></g>
+  <text x="775" y="138" text-anchor="middle" font-size="14" font-weight="bold" fill="#3a2c23">UI</text>
+  <text x="775" y="160" text-anchor="middle" font-size="11" fill="#6f5b4c">Button (pair / reset)</text>
+  <text x="775" y="178" text-anchor="middle" font-size="11" fill="#6f5b4c">RGB LED status</text>
+
+  <!-- power edges (green) -->
+  <g stroke="#7d9b86" stroke-width="2.5" fill="none" marker-end="url(#a2)">
+    <path d="M105,174 L105,210"/>
+    <path d="M105,270 L105,306"/>
+    <path d="M105,366 L105,402"/>
+    <path d="M170,430 C 260,430 250,170 328,165"/>
+    <path d="M170,432 C 300,470 560,470 688,300"/>
+  </g>
+  <!-- data edges (charcoal) -->
+  <g stroke="#7a5a48" stroke-width="2" fill="none" marker-end="url(#a2)">
+    <path d="M430,206 L430,260"/>
+    <path d="M430,322 L430,376"/>
+    <path d="M170,140 C 240,140 270,150 328,152"/>  <!-- usb data to... actually radio flash; keep light -->
+    <path d="M500,292 L688,292"/>
+    <path d="M170,142 C 250,120 600,120 688,150"/> <!-- usb-c to bridge data -->
+    <path d="M530,150 C 600,150 640,150 688,150"/> <!-- radio to UI gpio -->
+  </g>
+  <text x="250" y="500" font-size="11" fill="#7d9b86">— power</text>
+  <text x="330" y="500" font-size="11" fill="#7a5a48">— data / control</text>
+  <text x="40" y="528" font-size="11.5" fill="#8a7464" font-style="italic">Wired fast path = USB-C → bridge → storage (bypasses the radio). Wireless path = phone ⟷ C5 (BLE+WiFi) ⟷ storage. Never both at once.</text>
+</svg>

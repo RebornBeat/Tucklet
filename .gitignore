@@ -1,0 +1,11 @@
+# Rust
+**/target/
+# Hardware generator scratch
+hardware/_check/
+# OS / editor
+.DS_Store
+*.swp
+# Build outputs
+/build/
+# Mechanical render scratch
+mechanical/*.stl

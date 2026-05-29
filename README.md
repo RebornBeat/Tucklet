@@ -2,76 +2,101 @@
 
 **A pocket-sized companion drive that clips to your phone like a charm and holds your memories — no data cable, no babysitting, no clutter.**
 
-Tucklet is a small, battery-powered, wireless storage device. After a one-time pairing, your phone recognizes it automatically — no button press in daily use — and your photos and videos move on and off it through a clean app that never makes you think about "caches" or "sync states." It is designed to disappear into your daily carry — small enough to hang off your phone on a string or sit on the back — and to be usable by someone who has never thought about storage in their life.
+Tucklet is a small, battery-powered, wireless storage device. After a one-time
+pairing, your phone recognizes it automatically — no button press in daily use —
+and your photos and videos move on and off it through a clean app that never
+makes you think about "caches" or "sync states." It is designed to disappear
+into your daily carry, and to be usable by someone who has never thought about
+storage in their life.
 
 ![Tucklet flow](docs/assets/flow.svg)
 
-
-> **Status:** Foundation / pre-hardware. This repository contains the architecture, protocol, hardware design plan, firmware scaffold, and documentation. It is **not** a manufacture-ready board yet — see [Honesty & Scope](#honesty--scope).
+> **Status:** Engineering foundation, organized for build. The architecture,
+> protocol, per-variant hardware design, mechanical model, and the shared
+> firmware/app core are complete and (where they can be) compiled and tested.
+> The on-device firmware binary and the native apps build on this foundation —
+> see [Build status](#build-status).
 
 ---
 
-## Why Tucklet exists
-
-Phone storage fills up. The "solutions" on the market are either old clunky WiFi drives or glorified pendrives that hog your charging port and need a cable for everything. Cloud storage hides what is actually stored where, and quietly bills you forever.
-
-Tucklet's bet: people want **local storage they control**, with a UX as calm as the cloud and none of the mystery. Show the state plainly. Let the user decide what lives where. Make the hardware vanish.
-
-## What it is (and isn't)
+## What it is
 
 | | |
 |---|---|
-| **Storage** | A user-swappable **microSD card** behind a managed controller. Pick your own capacity; upgrade anytime. |
-| **Control link** | **Bluetooth LE** — discovery, the button-press authorization handshake, battery %, wake/sleep. Low power, always-cheap. |
-| **Data link** | **WiFi (SoftAP)** — the device hosts a tiny private network *only while transferring*. This is the only way to move real photo/video volumes wirelessly; Bluetooth is physically too slow. |
-| **Charging / fallback data** | **USB-C** — charge the battery, and a wired high-speed fallback when you want it. |
-| **Security** | The device is invisible and silent until you **press the button**. A press opens a short authorization window; your phone must be approved before any connection. Nothing is discoverable in the background. |
-| **It is NOT** | A Bluetooth-only drive (impossible — see [ADR-002](docs/adr/ADR-002-connectivity.md)), a cloud service, or a device with a custom flash chip (see [ADR-001](docs/adr/ADR-001-storage-media.md)). |
+| **Storage** | **microSD** (swappable) or **eMMC** (sealed) — your choice of variant. |
+| **Radio** | **ESP32-C5** (dual-band Wi-Fi 6 + BLE), single or dual. |
+| **Control link** | **BLE** — discovery, auth, battery %, wake. Low power, always cheap. |
+| **Wireless data** | **Wi-Fi** (SoftAP universally; **Wi-Fi Aware** seamlessly where certified). On only while transferring. |
+| **Wired data** | **USB-C → USB-HS bridge** — ~20–40 MB/s for bulk; also charges. |
+| **Security** | Invisible after a one-time pairing: silent low-duty BLE, cryptographic challenge-response, physical-press to enroll a *new* phone. |
 
-## The experience we are building
+## The experience
 
-- **Plain-language state, never jargon.** Files are shown as **On phone**, **On Tucklet**, or **Temporary** — never "cached." If you pull a file onto your phone temporarily, *you* set how long "temporary" lasts.
-- **Round-trip metadata.** When Tucklet takes a file off your phone, it remembers where it came from (album, app) so it can put it back exactly there. No orphaned files.
-- **Per-app organization, with a friendly view.** Organize by app (Camera, Screenshots, WhatsApp, …) rather than raw folders. Power users can still drill into folders; the default view never forces it.
-- **Battery & status you can trust.** The app shows real battery %, free space, and transfer progress — no guessing.
+- **Plain-language state, never jargon:** **On phone / On Tucklet / Temporary** — the word "cache" never appears.
+- **You set how long "Temporary" lasts** (1 hour / 1 day / 1 week / keep).
+- **Round-trip metadata:** files remember their origin album/app so "put it back" restores them exactly.
+- **Per-app organization** by default; a friendly folder view for power users, never forced.
+- **Honest transfer time:** every transfer shows an estimate before it starts and a live ETA while it runs.
+- **Trickle backup:** new photos back up automatically when the charm is near and idle, so the big transfer never has to happen.
+
+Full detail in [`docs/UX_SPEC.md`](docs/UX_SPEC.md).
 
 ## Repository layout
 
 ```
 tucklet/
-├── README.md                  # You are here
-├── LICENSING.md               # Which license covers what, and why
-├── LICENSE-HARDWARE.txt        # Hardware design files
-├── LICENSE-SOFTWARE.txt        # Firmware + app source
+├── README.md                  # you are here
+├── LICENSING.md               # which license covers what (source-available, non-commercial)
+├── LICENSE-HARDWARE.txt        # CC BY-NC-SA 4.0 (hardware/mechanical)
+├── LICENSE-SOFTWARE.txt        # PolyForm Noncommercial 1.0.0 (firmware/apps)
 ├── docs/
-│   ├── adr/                   # Architecture Decision Records (the "why")
-│   └── protocol/PROTOCOL.md   # The contract between firmware and apps
-├── hardware/                  # Component selection, pin map, BOM (KiCad work lives here)
-├── firmware/                  # Rust firmware for the ESP32-S3 (scaffold)
-├── software/                  # Companion apps (Android-first, then iOS, then desktop)
-└── mechanical/                # Enclosure design + the CAD round-trip workflow
+│   ├── INDEX.md               # documentation map — start here to navigate
+│   ├── FINAL_REVIEW.md        # current source of truth (supersedes ADRs)
+│   ├── VARIANT_MATRIX.md      # every build config, one codebase
+│   ├── TRANSFER_PERFORMANCE.md, UX_SPEC.md, POWER_THERMAL.md, PRIOR_ART_AND_LICENSE.md
+│   ├── adr/                   # original decision records (history)
+│   ├── protocol/PROTOCOL.md   # the wire contract (mirrored by tucklet-proto)
+│   └── assets/flow.svg
+├── hardware/
+│   ├── README.md              # hardware overview + how the variants relate
+│   ├── gen_hardware.py        # parametric SOURCE — regenerates every variant
+│   ├── common/                # shared parts rationale, cross-variant comparison, block diagram
+│   └── variants/              # one folder per board: SPEC, BOM, PIN_MAP, SCHEMATIC_PLAN, .net, diagram
+│       ├── singlec5-microsd/  ├── singlec5-emmc/  ├── dualc5-microsd/  └── dualc5-emmc/
+├── firmware/                  # Rust workspace (tucklet-proto + tucklet-core compile + tested)
+├── software/ios/              # iOS companion app (SwiftUI + File Provider)
+└── mechanical/                # parametric enclosure (renders STLs for both envelopes)
 ```
 
 ## Start here
 
-1. Read the four Architecture Decision Records in [`docs/adr/`](docs/adr/) — they explain the load-bearing choices (storage media, connectivity, iOS, power & pairing).
-2. Read [`docs/protocol/PROTOCOL.md`](docs/protocol/PROTOCOL.md) — the single contract that keeps firmware and apps in sync.
-3. Read [`hardware/COMPONENT_SELECTION.md`](hardware/COMPONENT_SELECTION.md) and [`hardware/PIN_MAP.md`](hardware/PIN_MAP.md) — these are what you build the KiCad schematic from.
+1. [`docs/INDEX.md`](docs/INDEX.md) — the full documentation map.
+2. [`docs/FINAL_REVIEW.md`](docs/FINAL_REVIEW.md) — the load-bearing decisions, current.
+3. [`hardware/README.md`](hardware/README.md) — the four board variants and how to build them in KiCad.
+4. [`docs/protocol/PROTOCOL.md`](docs/protocol/PROTOCOL.md) — the contract that keeps firmware and apps in sync.
 
-## Honesty & scope
+## Build status
 
-This repo is a real, buildable **foundation**, not a finished product. Specifically:
+What is **compiled and tested** here (run `cargo test` in `firmware/`):
 
-- The hardware section gives you a **verified component plan, pin map, and block diagram** to build the KiCad schematic from — it does **not** contain gerbers or pick-and-place files, because those require iterative layout, RF/antenna tuning, and a design-for-manufacture review on real silicon. Faking them would waste your money.
-- The firmware is a **structured Rust scaffold** with the real architecture in place, not flashed-and-tested production binaries.
-- Regulatory certification (FCC/CE) is required before sale because Tucklet contains radios. That is a real cost and timeline, budgeted in the docs.
+- `firmware/crates/tucklet-proto` — every wire type (variant matrix, states, origin metadata, transfers). *5 tests._
+- `firmware/crates/tucklet-core` — device brain: transfer-time estimator, link profiles, state machine, trickle scheduler, Temporary expiry, allow-list, transport resolution. *13 tests._
 
-What *is* production-grade here: the architecture, the protocol contract, the decision records, the licensing, and the build sequence. That is the part that is expensive to get wrong and cheap to get right early.
+What is **complete and verified to render**: the parametric hardware (4 variants, all netlists validated), the enclosure (renders watertight STLs for both envelopes), and all design docs.
+
+What **builds on this foundation and needs on-hardware/SDK bring-up**: the
+on-device ESP32-C5 firmware binary and the native apps (iOS present; Android +
+desktop next). Those can't be compiled in CI here against the C5 toolchain and
+the iOS 26 SDK, so they are written real and complete with the exact
+SDK-confirmation points flagged rather than guessed. See `docs/INDEX.md` for the
+current state of each.
 
 ## License
 
-Dual: hardware and software are licensed separately. See [LICENSING.md](LICENSING.md). Short version: **source-available, non-commercial** — you may study, build, and modify Tucklet, but not sell it. (Note: this is *not* an OSI/GNU "open source" license; that distinction is explained in LICENSING.md.)
+Dual, **source-available, non-commercial** (study/modify/build, don't sell):
+hardware under CC BY-NC-SA 4.0, software under PolyForm Noncommercial 1.0.0. This
+is *not* an OSI/GNU "open source" license — see [`LICENSING.md`](LICENSING.md).
 
 ---
 
-*Tucklet is an independent hardware project. "Tucklet" is a working product name — verify trademark availability in your launch markets before commercial use.*
+*"Tucklet" is a working product name (verified clear vs. the taken "Locket"/"Tuckit"). Trademark-check class 9 before commercial use.*

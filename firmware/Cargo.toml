@@ -1,0 +1,17 @@
+# Tucklet firmware workspace.
+# License: PolyForm Noncommercial 1.0.0 (see /LICENSE-SOFTWARE.txt)
+#
+# tucklet-proto and tucklet-core are pure, host-compilable crates (shared with
+# the apps). The on-device binary crate `tucklet-fw` (esp-idf, ESP32-C5) is built
+# with the Espressif toolchain, not this host workspace, and is added separately.
+[workspace]
+resolver = "2"
+members = [
+    "crates/tucklet-proto",
+    "crates/tucklet-core",
+]
+
+[workspace.package]
+edition = "2021"
+authors = ["Christian Alexander Liz-Fonts <RebornBeat>"]
+license-file = "../LICENSE-SOFTWARE.txt"
