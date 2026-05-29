@@ -1,44 +1,38 @@
 # Licensing
 
-This document explains exactly what is licensed how, and — importantly — corrects a common misconception so you make this decision with eyes open.
+This document explains the licensing structure for the Tucklet project. The project uses a dual-licensing model to balance open collaboration with commercial protection.
 
-## The misconception: "GNU lets others build but not sell"
+## Overview
 
-This is **not true**, and getting it wrong could expose you legally or make your repo say something you don't mean.
+Tucklet is **source-available**, not "open source" in the OSI definition sense. You are free to study, modify, and build the project for personal use, but commercial use is restricted.
 
-- **GPL and every GNU license explicitly permit commercial sale.** Anyone may take GPL software, sell it, and even charge whatever they like. The GPL only requires they pass along the source and the same freedoms. "No selling" is fundamentally incompatible with the GPL and with the formal definition of "open source" (both the Free Software Foundation and the Open Source Initiative *require* that commercial use be allowed).
-- So "others can build but not sell" is **not open source** at all. It is a **source-available, non-commercial** model. That's a legitimate choice — it's just not "GNU" or "open source," and you shouldn't label it as such.
+### 1. Firmware and Software
+**Directory:** `firmware/`, `software/`
+**License:** [`LICENSE-SOFTWARE.txt`](LICENSE-SOFTWARE.txt) (**PolyForm Noncommercial 1.0.0**)
 
-## What Tucklet actually uses
+This license grants you the right to use, modify, and distribute the code, but **not for commercial purposes**.
+*   **Permitted:** Personal projects, research, education, non-profit use, contributing improvements back to the project.
+*   **Prohibited:** Selling the software, devices running the software, or using the code in a commercial product without a separate commercial license agreement.
 
-Because your intent is *"others can study and build it, but I'm the one who sells it,"* Tucklet uses a non-commercial split:
+### 2. Hardware and Mechanical Design
+**Directory:** `hardware/`, `mechanical/`
+**License:** [`LICENSE-HARDWARE.txt`](LICENSE-HARDWARE.txt) (**CC BY-NC-SA 4.0**)
 
-| Layer | License | Why |
-|---|---|---|
-| **Firmware + app source** (`firmware/`, `software/`) | **PolyForm Noncommercial 1.0.0** | A clean, modern, plain-language source-available license. Grants everything *except* commercial use. Lets people learn from and contribute to your code without letting a competitor ship a clone for money. |
-| **Hardware design files** (`hardware/`, `mechanical/`) | **CC BY-NC-SA 4.0** | The standard non-commercial license for design/creative files. Attribution required, non-commercial, share-alike (derivatives stay under the same terms). |
+This license grants you the right to study, modify, and redistribute the hardware design files (schematics, PCB layouts, 3D models) under the following conditions:
+*   **Attribution:** You must give appropriate credit to the Tucklet project.
+*   **Non-Commercial:** You may not use the material for commercial purposes.
+*   **ShareAlike:** If you remix, transform, or build upon the material, you must distribute your contributions under the same license.
 
-`LICENSE-SOFTWARE.txt` and `LICENSE-HARDWARE.txt` carry the canonical texts (full text fetched from the license authors — see the headers in those files for the source URL to paste in).
+## Important Distinctions
 
-## The trade-off you are accepting
+### Why not GPL?
+GNU General Public Licenses (GPL) explicitly permit commercial sale. The intent of Tucklet's licensing is to allow the creator to sell the official device while preventing competitors from cloning the hardware or software for profit. Therefore, "No selling" is fundamentally incompatible with the GPL and with the formal definition of "open source."
 
-Non-commercial licensing is a real, defensible choice, but be aware:
+### "Open Source" vs. "Source-Available"
+Because the licenses used here restrict commercial use, Tucklet cannot technically be called "Open Source" (as defined by the Open Source Initiative). It is correctly described as **Source-Available**.
 
-1. **It deters some contributors.** Many open-source developers will not contribute to code they can never use commercially.
-2. **It is not "open source."** Don't put "open source" on your packaging or store page — it's inaccurate and the OSI actively pushes back on misuse of the term. Say **"source-available"** instead.
-3. **Enforcement is on you.** A license is only as strong as your willingness to enforce it. For a small seller, the practical protection is more about brand, support, and supply chain than litigation.
+### Patent Notice
+Copyright licensing covers the specific implementation (code, design files). It does not grant a patent license on general concepts. However, the project is intended to be a clean-room implementation. See `README.md` for prior art context.
 
-## If you change your mind later
-
-Two common pivots:
-
-- **Want maximum adoption and community?** Switch firmware/app to **Apache-2.0** or **MIT** and hardware to **CERN-OHL-S** (the hardware GPL). These *allow* selling — your moat becomes brand, distribution, and the assembled product, not the license. Most successful open hardware (Arduino, Adafruit, Pebble-era) works this way: the files are free, but people still buy the official polished unit.
-- **Want a business but still some openness?** Keep the apps source-available non-commercial, but **fully close** the firmware and hardware. Perfectly normal for a commercial product.
-
-You can relicense your *own* code at any time (you hold the copyright). You cannot retroactively relicense contributions others made under the old terms without their permission — so decide before you accept outside pull requests.
-
-## What you must NOT do
-
-- Do not call this "GNU" or "GPL." It isn't.
-- Do not call it "open source" on commercial materials. It's "source-available."
-- Do not mix in third-party GPL code into firmware you intend to keep non-commercial — GPL is "viral" and would force your whole firmware to become GPL (and thus commercially sellable by anyone). Audit every dependency's license. (The firmware's `Cargo.toml` lists dependency licenses for exactly this reason.)
+## Enforcement
+This license is designed to protect the project's sustainability. If you wish to use Tucklet technology in a commercial product, please contact the project maintainer to discuss commercial licensing terms.
