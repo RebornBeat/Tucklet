@@ -1,0 +1,81 @@
+PolyForm Noncommercial License 1.0.0
+
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
+
+## Acceptance
+
+In order to get any license under these terms, You must agree to them as
+both strict conditions of Your license and a strict warranty for all
+contributors to the Software.
+
+## Copyright License
+
+The contributor licenses You, under copyright, to do everything with the
+Software that would otherwise infringe the contributor's copyright in it,
+under the terms of this License, as follows:
+
+1.  You may reproduce and modify the Software, and distribute copies of the
+    Software and Your modifications, provided that You give recipients
+    permission to do the same.
+
+## Patent License
+
+The contributor licenses You, under any patent claims the contributor can
+license, to do everything with the Software that would otherwise infringe
+those claims, under the terms of this License, as follows:
+
+1.  You may make, use, sell, offer for sale, import, and export the Software
+    and Your modifications, provided that You give recipients permission to
+    do the same.
+
+## Exceptions
+
+This License does not authorize You to do anything with the Software that
+would infringe the intellectual property rights of any third party.
+
+1.  **Commercial Use**. You may not exercise any of the rights granted to You
+    under this License for any purpose that is primarily intended for or
+    directed toward commercial advantage or private monetary compensation.
+    The exchange of the Software for other copyrighted works by means of
+    digital file-sharing or otherwise shall not be considered to be primarily
+    intended for or directed toward commercial advantage or private monetary
+    compensation, provided there is no payment of any monetary compensation in
+    connection with the exchange of copyrighted works.
+
+2.  **Compatibility**. You may not exercise any of the rights granted to You
+    under this License for any purpose that is primarily intended for or
+    directed toward creating a derivative work based on the Software that is
+    compatible with a license that is listed on the PolyForm Noncompatible
+    Licenses List, as published by the PolyForm Project.
+
+## No Other License
+
+No other license to the Software is granted by this License.
+
+## Patent Defense
+
+If any contributor makes a claim against You that the Software infringes
+any patent, any patent license granted to that contributor under this
+License for the Software terminates as of the date such claim is made.
+
+## Termination
+
+This License, and all rights granted hereunder, terminates if You fail to
+comply with any term of this License.
+
+## Disclaimer of Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## Limitation of Liability
+
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
