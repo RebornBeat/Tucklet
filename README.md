@@ -65,6 +65,8 @@ tucklet/
 │       ├── singlec5-microsd/  ├── singlec5-emmc/  ├── dualc5-microsd/  └── dualc5-emmc/
 ├── firmware/                  # Rust workspace (tucklet-proto + tucklet-core compile + tested)
 ├── software/ios/              # iOS companion app (SwiftUI + File Provider)
+├── software/android/          # Android app (Kotlin + Jetpack Compose)
+├── software/desktop/          # Desktop: USB-drive when wired + wireless companion (Rust core/CLI + Tauri GUI)
 └── mechanical/                # parametric enclosure (renders STLs for both envelopes)
 ```
 
@@ -80,7 +82,7 @@ tucklet/
 What is **compiled and tested** here (run `cargo test` in `firmware/`):
 
 - `firmware/crates/tucklet-proto` — every wire type (variant matrix, states, origin metadata, transfers). *5 tests._
-- `firmware/crates/tucklet-core` — device brain: transfer-time estimator, link profiles, state machine, trickle scheduler, Temporary expiry, allow-list, transport resolution. *13 tests._
+- `firmware/crates/tucklet-core` — device brain: estimator, link profiles, state machine, trickle scheduler, **session credentials**, Temporary expiry, allow-list, transport resolution. *16 tests._
 
 What is **complete and verified to render**: the parametric hardware (4 variants, all netlists validated), the enclosure (renders watertight STLs for both envelopes), and all design docs.
 

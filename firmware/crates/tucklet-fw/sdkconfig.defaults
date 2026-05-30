@@ -1,0 +1,33 @@
+# Tucklet firmware sdkconfig defaults (ESP32-C5).
+# Custom partition table (app + OTA + NVS for the allow-list).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Bluetooth: NimBLE host only (BLE), no Classic.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+
+# Wi-Fi: enable SoftAP + station; size buffers for throughput.
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=32
+
+# HTTP server: allow large file streaming.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+CONFIG_HTTPD_MAX_URI_LEN=512
+
+# FATFS with long filenames + exFAT for >4GB files and cross-platform cards.
+CONFIG_FATFS_LFN_HEAP=y
+CONFIG_FATFS_LFN_STACK=n
+CONFIG_FATFS_API_ENCODING_UTF_8=y
+
+# Brownout detector ON (mid-transfer 5GHz TX current spikes).
+CONFIG_ESP_BROWNOUT_DET=y
+CONFIG_ESP_BROWNOUT_DET_LVL_SEL_7=y
+
+# Task watchdog ON.
+CONFIG_ESP_TASK_WDT_EN=y
+
+# Main task stack (HTTP + JSON need headroom).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=12288

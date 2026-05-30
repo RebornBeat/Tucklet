@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Tucklet",
+  "version": "0.1.0",
+  "identifier": "app.tucklet.desktop",
+  "build": {
+    "beforeDevCommand": "npm start",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      { "title": "Tucklet", "width": 980, "height": 720, "minWidth": 720, "minHeight": 520 }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"]
+  }
+}

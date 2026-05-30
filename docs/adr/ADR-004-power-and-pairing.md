@@ -1,3 +1,9 @@
+> **SUPERSESSION NOTICE (read first).** This ADR is kept for history.
+> The finalized design has moved on in the ways noted here; where this
+> document and `../FINAL_REVIEW.md` differ, **FINAL_REVIEW wins**.
+>
+> SoC is the ESP32-C5, not the S3. The 'press to summon every time' model is replaced by 'press once to pair, invisible (silent BLE + cryptographic challenge-response) thereafter'; the button's daily job is only factory-reset. See FINAL_REVIEW §3.
+
 # ADR-004: Power, SoC, and the button-gated pairing/auth model
 
 **Status:** Accepted · **Date:** 2026-05

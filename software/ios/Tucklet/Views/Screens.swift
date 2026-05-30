@@ -41,6 +41,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     presenceCard
+                    if !model.lastOffloadIds.isEmpty { undoBanner }
                     summaryCard
                     quickActions
                 }.padding()
@@ -48,6 +49,17 @@ struct HomeView: View {
             .background(Brand.paper.ignoresSafeArea())
             .navigationTitle("Tucklet")
         }
+    }
+
+    private var undoBanner: some View {
+        HStack {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(Brand.accent)
+            Text("Backed up \(model.lastOffloadIds.count) photos").foregroundStyle(Brand.ink)
+            Spacer()
+            Button("Undo") { Task { await model.undoLastOffload() } }
+                .font(.subheadline.bold()).foregroundStyle(Brand.accent)
+        }
+        .padding().background(RoundedRectangle(cornerRadius: 16).fill(Brand.accent.opacity(0.08)))
     }
 
     private var presenceCard: some View {
@@ -72,7 +84,7 @@ struct HomeView: View {
     }
 
     private var summaryCard: some View {
-        let pending = model.manifest?.items.filter { $0.state == .onPhone }.count ?? 0
+        let pending = model.pendingBackupCount
         return HStack {
             Image(systemName: pending == 0 ? "checkmark.seal.fill" : "tray.and.arrow.up")
                 .foregroundStyle(Brand.accent)
@@ -115,14 +127,23 @@ struct LibraryView: View {
     @State private var kind: TransferKind = .offload
 
     var grouped: [(app: String, items: [MediaItem])] {
-        let items = model.manifest?.items ?? []
-        let groups = Dictionary(grouping: items, by: { $0.origin.app })
-        return groups.keys.sorted().map { (app: $0, items: groups[$0]!) }
+        model.libraryGroups()
     }
 
     var body: some View {
         NavigationStack {
             List {
+                if model.pendingBackupCount > 0 {
+                    Section {
+                        Button {
+                            // Quick action: select all pending + offload.
+                            selection = Set(pendingItems.map(\.id)); kind = .offload; showTransfer = true
+                        } label: {
+                            Label("Back up \(model.pendingBackupCount) new photos", systemImage: "tray.and.arrow.up")
+                                .foregroundStyle(Brand.accent)
+                        }
+                    }
+                }
                 ForEach(grouped, id: \.app) { group in
                     Section(group.app) {
                         ForEach(group.items) { item in row(item) }
@@ -134,38 +155,144 @@ struct LibraryView: View {
             .toolbar {
                 if !selection.isEmpty {
                     ToolbarItemGroup(placement: .bottomBar) {
-                        Button { kind = .offload; showTransfer = true } label: { Label("Free up space", systemImage: "tray.and.arrow.up") }
+                        if selectionHasOnPhone {
+                            Button { kind = .offload; showTransfer = true } label: { Label("Free up space", systemImage: "tray.and.arrow.up") }
+                        }
                         Spacer()
-                        Button { kind = .load; showTransfer = true } label: { Label("Get a copy", systemImage: "tray.and.arrow.down") }
+                        if selectionHasOnTucklet {
+                            Button { kind = .load; showTransfer = true } label: { Label("Get a copy", systemImage: "tray.and.arrow.down") }
+                        }
                     }
                 }
             }
-            .task { if model.manifest == nil { await model.loadLibrary() } }
+            .task {
+                if model.manifest == nil { await model.loadLibrary() }
+                if model.onPhoneItems.isEmpty { await model.refreshPhoneLibrary() }
+            }
             .sheet(isPresented: $showTransfer) {
-                TransferSheet(kind: kind, items: selectedItems)
+                TransferSheet(kind: kind, items: selectedItems) {
+                    selection.removeAll()
+                }
             }
         }
     }
 
-    private var selectedItems: [MediaItem] {
-        (model.manifest?.items ?? []).filter { selection.contains($0.id) }
+    private var allItems: [MediaItem] { model.onPhoneItems + (model.manifest?.items ?? []) }
+    private var selectedItems: [MediaItem] { allItems.filter { selection.contains($0.id) } }
+    private var pendingItems: [MediaItem] {
+        let onTucklet = Set((model.manifest?.items ?? []).map { $0.id })
+        return model.onPhoneItems.filter { !onTucklet.contains($0.id) }
+    }
+    private var selectionHasOnPhone: Bool {
+        selectedItems.contains { if case .onPhone = $0.state { return true } else { return false } }
+    }
+    private var selectionHasOnTucklet: Bool {
+        selectedItems.contains { if case .onTucklet = $0.state { return true } else { return false } }
     }
 
     private func row(_ item: MediaItem) -> some View {
-        HStack {
-            Image(systemName: selection.contains(item.id) ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(selection.contains(item.id) ? Brand.accent : Brand.muted)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.name).foregroundStyle(Brand.ink).lineLimit(1)
-                HStack { StateBadge(state: item.state); Text(ByteFormat.short(item.sizeBytes)).font(.caption2).foregroundStyle(Brand.muted) }
+        HStack(spacing: 12) {
+            Button {
+                if selection.contains(item.id) { selection.remove(item.id) } else { selection.insert(item.id) }
+            } label: {
+                Image(systemName: selection.contains(item.id) ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selection.contains(item.id) ? Brand.accent : Brand.muted)
             }
-            Spacer()
-            Image(systemName: item.isVideo ? "video" : "photo").foregroundStyle(Brand.muted)
+            .buttonStyle(.plain)
+            .accessibilityLabel(selection.contains(item.id) ? "Selected" : "Not selected")
+
+            NavigationLink {
+                ItemDetailView(item: item)
+            } label: {
+                HStack(spacing: 12) {
+                    Thumbnail(item: item).frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.name).foregroundStyle(Brand.ink).lineLimit(1)
+                        HStack { StateBadge(state: item.state); Text(ByteFormat.short(item.sizeBytes)).font(.caption2).foregroundStyle(Brand.muted) }
+                    }
+                    Spacer()
+                }
+            }
+            .accessibilityLabel("\(item.name), \(item.state.label)")
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if selection.contains(item.id) { selection.remove(item.id) } else { selection.insert(item.id) }
+    }
+}
+
+/// Async thumbnail that works for both on-phone (PhotoKit) and on-Tucklet (HTTP).
+struct Thumbnail: View {
+    @EnvironmentObject var model: AppModel
+    let item: MediaItem
+    @State private var image: UIImage?
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: 8).fill(Brand.accent.opacity(0.10))
+                Image(systemName: item.isVideo ? "video" : "photo").foregroundStyle(Brand.muted)
+            }
         }
+        .task(id: item.id) { image = await model.thumbnail(for: item) }
+    }
+}
+
+/// Detail for one item: large thumbnail, state, origin, and the right actions.
+struct ItemDetailView: View {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.dismiss) var dismiss
+    let item: MediaItem
+    @State private var busy = false
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                Thumbnail(item: item).frame(height: 240).clipShape(RoundedRectangle(cornerRadius: 16))
+                Text(item.name).font(.headline).foregroundStyle(Brand.ink)
+                StateBadge(state: item.state)
+                VStack(alignment: .leading, spacing: 6) {
+                    detail("From", item.origin.app)
+                    if let album = item.origin.album { detail("Album", album) }
+                    detail("Size", ByteFormat.short(item.sizeBytes))
+                    detail("Type", item.isVideo ? "Video" : "Photo")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding().background(RoundedRectangle(cornerRadius: 14).fill(.white))
+
+                actions
+            }.padding()
+        }
+        .background(Brand.paper.ignoresSafeArea())
+        .navigationTitle("Details").navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder private var actions: some View {
+        switch item.state {
+        case .onTucklet:
+            Button { run { try await model.restore(item) } } label: {
+                actionLabel("Put back on phone", "tray.and.arrow.down")
+            }
+            Button(role: .destructive) { Task { busy = true; await model.delete(item); busy = false; dismiss() } } label: {
+                actionLabel("Delete from Tucklet", "trash")
+            }
+        case .onPhone:
+            Button { run { try await model.offloadItem(item); await model.finishOffload(deletedIds: []) } } label: {
+                actionLabel("Back up to Tucklet", "tray.and.arrow.up")
+            }
+        case .temporary:
+            Text("This is a temporary copy on your phone.").foregroundStyle(Brand.muted)
+        }
+    }
+
+    private func run(_ work: @escaping () async throws -> Void) {
+        Task { busy = true; try? await work(); busy = false; dismiss() }
+    }
+    private func detail(_ k: String, _ v: String) -> some View {
+        HStack { Text(k).foregroundStyle(Brand.muted); Spacer(); Text(v).foregroundStyle(Brand.ink) }
+    }
+    private func actionLabel(_ t: String, _ icon: String) -> some View {
+        Label(t, systemImage: icon).font(.headline).frame(maxWidth: .infinity).padding()
+            .background(Brand.accent.opacity(busy ? 0.4 : 1)).foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -176,6 +303,7 @@ struct TransferSheet: View {
     @Environment(\.dismiss) var dismiss
     let kind: TransferKind
     let items: [MediaItem]
+    var onDone: () -> Void = {}
 
     @State private var mode: TransferMode = .batch
     @State private var policy: TemporaryPolicy = .oneWeek
@@ -239,6 +367,7 @@ struct TransferSheet: View {
             .background(Brand.paper.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .onAppear { policy = model.defaultTemporaryPolicy }
         }
     }
 
@@ -255,14 +384,30 @@ struct TransferSheet: View {
         engine.engine = e
         let req = TransferRequest(kind: kind, mode: mode, items: transferItems,
                                   temporaryPolicy: kind == .load ? policy : nil)
-        if mode == .batch {
-            await e.runBatch(req,
-                             loadDestination: { item in
-                                 FileManager.default.temporaryDirectory.appendingPathComponent(item.id)
-                             })
+
+        if mode == .trickle {
+            // Auto mode: just enable trickle and let the scheduler drip in the
+            // background; nothing to run synchronously here.
+            model.trickleEnabled = true
+            onDone(); dismiss(); return
         }
-        // Trickle mode hands off to the background scheduler (see TransferEngine.Trickle).
-        if e.lastError == nil { dismiss() }
+
+        switch kind {
+        case .offload:
+            let completed = await e.runBatch(req) { item in
+                try await model.offloadItem(item)
+            }
+            // Free up space: after a successful upload, remove the originals
+            // from the phone and record them for Undo.
+            await model.finishOffload(deletedIds: completed)
+        case .load:
+            let chosen = policy
+            _ = await e.runBatch(req) { item in
+                try await model.loadItem(item, policy: chosen)
+            }
+        }
+
+        if e.lastError == nil { onDone(); dismiss() }
     }
 }
 
@@ -275,6 +420,7 @@ struct TransferSheet: View {
 
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
+    @State private var showForget = false
     var body: some View {
         NavigationStack {
             Form {
@@ -295,13 +441,27 @@ struct SettingsView: View {
                         LabeledContent("Firmware", value: s.firmwareVersion)
                     }
                 }
+                if !model.lastOffloadIds.isEmpty {
+                    Section("Recent") {
+                        Button {
+                            Task { await model.undoLastOffload() }
+                        } label: {
+                            Label("Undo last backup (\(model.lastOffloadIds.count) photos)", systemImage: "arrow.uturn.backward")
+                        }
+                    }
+                }
                 Section("Paired phones") {
-                    // Production: list allow-list entries from the device; allow "Forget".
                     Text("This phone").foregroundStyle(Brand.ink)
-                    Button("Forget this Tucklet", role: .destructive) { /* revoke flow */ }
+                    Button("Forget this Tucklet", role: .destructive) { showForget = true }
+                } footer: {
+                    Text("Forgetting stops this phone from connecting. To also erase this phone from the Tucklet itself, hold the button on the device for 5 seconds to factory-reset it.")
                 }
             }
             .navigationTitle("Settings")
+            .confirmationDialog("Forget this Tucklet on this phone?", isPresented: $showForget, titleVisibility: .visible) {
+                Button("Forget", role: .destructive) { Task { await model.forgetTucklet() } }
+                Button("Cancel", role: .cancel) {}
+            }
         }
     }
 }

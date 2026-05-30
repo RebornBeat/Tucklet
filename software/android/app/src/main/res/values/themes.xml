@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose drives the real theme; this is the base for the Activity. -->
+    <style name="Theme.Tucklet" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

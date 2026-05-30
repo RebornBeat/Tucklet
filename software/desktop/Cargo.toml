@@ -1,0 +1,10 @@
+# Tucklet desktop — verified Rust workspace (core + CLI).
+# The GUI shell (Tauri + React) lives in ./ui and is its own project, kept out
+# of this workspace so `cargo test` here stays dependency-light and green.
+# License: PolyForm Noncommercial 1.0.0
+[workspace]
+resolver = "2"
+members = [
+    "tucklet-desktop-core",
+    "tucklet-desktop-cli",
+]

@@ -26,6 +26,8 @@ public final class BLEControlClient: NSObject, ObservableObject {
     @Published public private(set) var isConnected = false
     @Published public private(set) var lastStatus: StatusReport?
     @Published public private(set) var capabilities: DeviceCapabilities?
+    /// The most recent challenge nonce the device pushed (to be signed for a session).
+    @Published public private(set) var lastNonce: Data?
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
@@ -198,6 +200,31 @@ extension BLEControlClient: CBCentralManagerDelegate, CBPeripheralDelegate {
                let s = try? JSONDecoder().decode(StatusReport.self, from: v) {
                 self.lastStatus = s
             }
+            // The device pushes a fresh challenge nonce on the SESSION
+            // characteristic when we connect; capture it so we can sign it.
+            if uuid == TuckletGATT.sessionChar, let v = characteristic.value,
+               let obj = try? JSONSerialization.jsonObject(with: v) as? [String: Any],
+               let hexNonce = obj["nonce"] as? String,
+               let nonce = Data(hexString: hexNonce) {
+                self.lastNonce = nonce
+            }
         }
+    }
+}
+
+// MARK: - hex helper
+extension Data {
+    /// Initialize from a hex string (even length, [0-9a-fA-F]); nil if malformed.
+    init?(hexString: String) {
+        let chars = Array(hexString)
+        guard chars.count % 2 == 0 else { return nil }
+        var bytes = [UInt8](); bytes.reserveCapacity(chars.count / 2)
+        var i = 0
+        while i < chars.count {
+            guard let hi = chars[i].hexDigitValue, let lo = chars[i + 1].hexDigitValue else { return nil }
+            bytes.append(UInt8(hi << 4 | lo))
+            i += 2
+        }
+        self = Data(bytes)
     }
 }

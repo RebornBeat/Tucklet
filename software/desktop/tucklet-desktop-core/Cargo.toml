@@ -1,0 +1,26 @@
+[package]
+name = "tucklet-desktop-core"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop client core for Tucklet: /v1 HTTP data client, transfer engine, auth + discovery seams. Reuses the shared tucklet-proto + tucklet-core."
+license-file = "../../../LICENSE-SOFTWARE.txt"
+
+[dependencies]
+tucklet-proto = { path = "../../../firmware/crates/tucklet-proto" }
+tucklet-core  = { path = "../../../firmware/crates/tucklet-core" }
+tucklet-crypto = { path = "../../../firmware/crates/tucklet-crypto" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Real BLE discovery is gated so the default build/test stays system-lib-free.
+# Enable with `--features ble` in an environment with the platform BT stack.
+btleplug = { version = "0.11", optional = true }
+tokio = { version = "1", features = ["rt", "macros", "time"], optional = true }
+uuid = { version = "1", optional = true }
+
+[features]
+default = []
+ble = ["dep:btleplug", "dep:tokio", "dep:uuid"]
+
+[dev-dependencies]
+serde_json = "1"

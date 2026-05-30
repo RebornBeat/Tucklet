@@ -52,11 +52,19 @@ public struct DataClient: Sendable {
     }
 
     /// POST /v1/file — upload a local file with its origin metadata.
-    public func upload(fileURL: URL, origin: OriginMetadata) async throws {
+    /// POST /v1/file — upload a local file. The firmware stores the full
+    /// MediaItem (origin, name, mime, created_at, id) so it can rebuild the
+    /// manifest and support round-trip restore; we send it base64 in the header
+    /// and the body is pure bytes (streamable, large-file safe).
+    public func upload(fileURL: URL, origin: OriginMetadata, item: MediaItem) async throws {
         var r = request("v1/file", method: "POST")
         r.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        let originJSON = try JSONEncoder().encode(origin)
-        r.setValue(originJSON.base64EncodedString(), forHTTPHeaderField: "X-Tucklet-Origin")
+        // The firmware stores this MediaItem verbatim (and forces its state to
+        // onTucklet). `origin` is already part of `item`; passed separately for
+        // call-site clarity.
+        _ = origin
+        let itemJSON = try JSONEncoder().encode(item)
+        r.setValue(itemJSON.base64EncodedString(), forHTTPHeaderField: "X-Tucklet-Origin")
         let (_, resp) = try await session.upload(for: r, fromFile: fileURL)
         try Self.check(resp)
     }

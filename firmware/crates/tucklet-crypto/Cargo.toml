@@ -1,0 +1,18 @@
+[package]
+name = "tucklet-crypto"
+version = "0.1.0"
+edition = "2021"
+description = "Shared Ed25519 identity + challenge-response auth for Tucklet (device verify + client sign). Host-testable; used by firmware and the desktop client."
+license-file = "../../../LICENSE-SOFTWARE.txt"
+
+[dependencies]
+ed25519-dalek = { version = "2", default-features = false, features = ["alloc"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+# Only needed to *generate* a fresh key (clients on std platforms). The firmware
+# (no_std) only verifies + the device key comes from the hardware RNG, so this is
+# std-gated and absent from the firmware build.
+rand_core = { version = "0.6", features = ["getrandom"], optional = true }
+
+[features]
+default = ["std"]
+std = ["ed25519-dalek/std", "ed25519-dalek/rand_core", "hex/std", "dep:rand_core"]

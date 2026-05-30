@@ -1,0 +1,78 @@
+# tucklet-fw — the on-device firmware binary for the ESP32-C5.
+#
+# This crate is built with the Espressif Rust toolchain (esp-idf), NOT the host
+# workspace, so it declares its own [workspace] table to stay independent of
+# ../../Cargo.toml (which builds the pure tucklet-proto / tucklet-core on host).
+#
+# Build (after `cargo install espup && espup install` and sourcing the env):
+#   cd firmware/crates/tucklet-fw
+#   cargo build --release --features singlec5,microsd,softap
+#
+# License: PolyForm Noncommercial 1.0.0
+[package]
+name = "tucklet-fw"
+version = "0.1.0"
+edition = "2021"
+authors = ["Christian Alexander Liz-Fonts <RebornBeat>"]
+license-file = "../../../LICENSE-SOFTWARE.txt"
+resolver = "2"
+rust-version = "1.77"
+
+[workspace]
+# Independent of the host workspace; built with the esp toolchain.
+
+[[bin]]
+name = "tucklet-fw"
+harness = false
+
+[features]
+# Exactly one radio_* and one storage_* feature must be selected; transport_*
+# are additive (softap is always recommended on). These mirror the variant
+# matrix in ../../../docs/VARIANT_MATRIX.md and drive board::capabilities().
+default = ["singlec5", "microsd", "softap"]
+
+singlec5 = []
+dualc5   = []
+microsd  = []
+emmc     = []
+
+softap      = []
+wifi_aware  = []   # CONFIRM ESP32-C5 NAN support on your ESP-IDF before enabling
+wired_usbhs = []   # bridge IC owns storage when plugged in (host-side; firmware just yields the bus)
+
+# eMMC capacity advertised in DeviceCapabilities (GiB). Override at build time,
+# e.g. --features emmc + TUCKLET_EMMC_GIB=64 env, or edit board.rs.
+
+[dependencies]
+# Shared logic + wire types (the tested host crates).
+tucklet-proto = { path = "../tucklet-proto", default-features = false, features = ["std"] }
+tucklet-core  = { path = "../tucklet-core",  default-features = false, features = ["std"] }
+
+# esp-idf std runtime + services.
+esp-idf-svc = { version = "0.49", default-features = false, features = ["std", "binstart"] }
+esp-idf-hal = { version = "0.44", default-features = false }
+esp-idf-sys = { version = "0.35", default-features = false }
+
+# BLE GATT server (NimBLE) for the ESP32 family.
+esp32-nimble = "0.8"
+
+# Serialization for BLE payloads and the HTTP API.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Ed25519 verification of the phone's session challenge (no_std-friendly, alloc).
+ed25519-dalek = { version = "2", default-features = false, features = ["alloc"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+# Shared, host-tested implementation of the challenge-response primitive.
+tucklet-crypto = { path = "../tucklet-crypto", default-features = false }
+
+log = "0.4"
+anyhow = "1"
+
+[build-dependencies]
+embuild = "0.32"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1

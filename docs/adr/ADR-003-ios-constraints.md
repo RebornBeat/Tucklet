@@ -1,3 +1,9 @@
+> **SUPERSESSION NOTICE (read first).** This ADR is kept for history.
+> The finalized design has moved on in the ways noted here; where this
+> document and `../FINAL_REVIEW.md` differ, **FINAL_REVIEW wins**.
+>
+> Still Android-first, but iOS in 2026 is much closer to parity: AccessorySetupKit one-tap pairing, Wi-Fi Aware, and File Provider integration. The hard limit that remains is fully-autonomous background sync. See FINAL_REVIEW §2.
+
 # ADR-003: iOS platform constraints — Android first
 
 **Status:** Accepted · **Date:** 2026-05

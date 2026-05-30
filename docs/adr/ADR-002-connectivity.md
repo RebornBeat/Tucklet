@@ -1,3 +1,9 @@
+> **SUPERSESSION NOTICE (read first).** This ADR is kept for history.
+> The finalized design has moved on in the ways noted here; where this
+> document and `../FINAL_REVIEW.md` differ, **FINAL_REVIEW wins**.
+>
+> The two-plane (BLE+SoftAP) model is now a three-layer model: BLE control + Wi-Fi Aware (seamless, where certified) + SoftAP (universal fallback) + a USB-HS wired bridge for bulk. SoC is the ESP32-C5 (dual-band Wi-Fi 6), not the S3.
+
 # ADR-002: Connectivity — BLE control plane + WiFi data plane (NOT Bluetooth-only)
 
 **Status:** Accepted · **Date:** 2026-05

@@ -58,14 +58,18 @@ the top.
 |---|---|---|
 | Shared wire types | `../firmware/crates/tucklet-proto` | **Compiles + 5 tests pass** |
 | Device logic (estimator, state machine, trickle, allow-list, expiry, transport) | `../firmware/crates/tucklet-core` | **Compiles + 13 tests pass** |
-| On-device firmware binary | `../firmware/crates/tucklet-fw` | Next — esp-idf / ESP32-C5; builds on the two crates above |
-| iOS app | `../software/ios` | Present (SwiftUI + File Provider); WiFiAware/AccessorySetupKit/Secure-Enclave call-sites flagged `CONFIRM` against the iOS 26 SDK |
-| Android app | `../software/android` | Next |
-| Desktop app | `../software/desktop` | Next |
+| On-device firmware binary | `../firmware/crates/tucklet-fw` | **Present** — esp-idf/ESP32-C5; pure logic tested (ui 3, httpd 3), esp glue flagged CONFIRM |
+| iOS app | `../software/ios` | **Present**, full UX-spec (PhotoKit, AccessorySetupKit pairing, trickle, restore, undo); pure logic verified; SDK call-sites flagged `CONFIRM` |
+| Android app | `../software/android` | **Present**, full UX-spec (MediaStore, CompanionDeviceManager, programmatic Wi-Fi, WorkManager trickle); estimator+protocol compiled & tested with kotlinc; SDK call-sites flagged `CONFIRM` |
+| Desktop app | `../software/desktop` | **Present**: wired = mounts as a USB drive (no app); wireless companion = Rust core + CLI **compiled & tested** (21 tests, incl. a live socket smoke test and an end-to-end enroll/handshake/data integration test against a mock device built from the shared crates) reusing the shared crates, plus a Tauri+React GUI shell flagged `CONFIRM` |
 
 ## Roadmap order
 1. ✅ Reorganize repo; finalize per-variant hardware; verify CAD + code.
 2. Finalize remaining docs alignment (ADR supersession banners already noted here).
-3. Complete the on-device firmware binary (`tucklet-fw`).
-4. Complete the iOS app to full UX-spec functionality.
-5. Add Android, then desktop, sharing the same protocol + estimator.
+3. ✅ On-device firmware binary (`tucklet-fw`) written; esp glue pending hardware bring-up.
+4. ✅ iOS app to full UX-spec functionality.
+5. ✅ Android app to full UX-spec functionality.
+6. ✅ Desktop: wired mounts as a USB drive (no app); wireless companion (Rust core + CLI, compiled & tested) + Tauri/React GUI shell, reusing the shared protocol + estimator.
+
+All three client platforms (iOS, Android, desktop) and the firmware now share one wire protocol and one transfer estimator.
+7. ✅ Crypto seam closed: a shared, host-tested `tucklet-crypto` crate (Ed25519, RFC 8032) does the device verify + desktop signing; iOS uses CryptoKit, Android uses BouncyCastle. Verified cross-stack: BouncyCastle and ed25519-dalek produce byte-identical signatures for the same key+nonce, so a phone-signed challenge verifies on the device. Remaining: confirm at-rest key storage (Keychain / EncryptedSharedPreferences / OS keychain) on real devices.

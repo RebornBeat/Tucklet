@@ -154,10 +154,58 @@ public struct MediaItem: Codable, Sendable, Equatable, Identifiable {
     public let state: ItemState
     public let checksum: String?
 
+    // `state` is flattened to the top level to match the firmware's
+    // #[serde(flatten)] (JSON carries "state" and optional "expires_at"
+    // alongside the other fields, not as a nested object).
     enum CodingKeys: String, CodingKey {
         case id, name, sizeBytes = "size_bytes", mime, createdAt = "created_at"
-        case origin, state, checksum
+        case origin, checksum
+        case state, expires_at
     }
+
+    public init(id: String, name: String, sizeBytes: UInt64, mime: String,
+                createdAt: EpochSeconds, origin: OriginMetadata, state: ItemState,
+                checksum: String?) {
+        self.id = id; self.name = name; self.sizeBytes = sizeBytes; self.mime = mime
+        self.createdAt = createdAt; self.origin = origin; self.state = state; self.checksum = checksum
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        sizeBytes = try c.decode(UInt64.self, forKey: .sizeBytes)
+        mime = try c.decode(String.self, forKey: .mime)
+        createdAt = try c.decode(EpochSeconds.self, forKey: .createdAt)
+        origin = try c.decode(OriginMetadata.self, forKey: .origin)
+        checksum = try c.decodeIfPresent(String.self, forKey: .checksum)
+        // Flattened state, read from the same container.
+        switch try c.decode(String.self, forKey: .state) {
+        case "on_phone": state = .onPhone
+        case "on_tucklet": state = .onTucklet
+        case "temporary": state = .temporary(expiresAt: try c.decodeIfPresent(EpochSeconds.self, forKey: .expires_at))
+        case let other: throw DecodingError.dataCorruptedError(forKey: .state, in: c, debugDescription: "unknown state \(other)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(sizeBytes, forKey: .sizeBytes)
+        try c.encode(mime, forKey: .mime)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(origin, forKey: .origin)
+        try c.encodeIfPresent(checksum, forKey: .checksum)
+        switch state {
+        case .onPhone: try c.encode("on_phone", forKey: .state)
+        case .onTucklet: try c.encode("on_tucklet", forKey: .state)
+        case .temporary(let e):
+            try c.encode("temporary", forKey: .state)
+            try c.encodeIfPresent(e, forKey: .expires_at)
+        }
+    }
+
     public var isImage: Bool { mime.hasPrefix("image/") }
     public var isVideo: Bool { mime.hasPrefix("video/") }
 }

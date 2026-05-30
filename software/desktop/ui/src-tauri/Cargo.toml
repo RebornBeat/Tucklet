@@ -1,0 +1,25 @@
+# Tucklet desktop GUI — Tauri backend. Own project (not in the verified core
+# workspace) since the tauri crate pulls platform webview/system libs.
+# Build in your environment: `npm install && npm run tauri build`.
+# License: PolyForm Noncommercial 1.0.0
+[package]
+name = "tucklet-desktop-gui"
+version = "0.1.0"
+edition = "2021"
+license-file = "../../../../LICENSE-SOFTWARE.txt"
+
+[lib]
+name = "tucklet_desktop_gui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tucklet-desktop-core = { path = "../../tucklet-desktop-core" }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

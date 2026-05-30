@@ -1,3 +1,9 @@
+> **SUPERSESSION NOTICE (read first).** This ADR is kept for history.
+> The finalized design has moved on in the ways noted here; where this
+> document and `../FINAL_REVIEW.md` differ, **FINAL_REVIEW wins**.
+>
+> microSD remains the entry variant, but eMMC is now a shipping sealed variant too (see hardware/common/VARIANTS.md), not just a 'revisit later' option. Both are built.
+
 # ADR-001: Storage media — microSD over custom flash or eMMC
 
 **Status:** Accepted · **Date:** 2026-05 · **Decision owner:** Christian

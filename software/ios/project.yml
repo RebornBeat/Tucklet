@@ -33,6 +33,7 @@ targets:
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "Tucklet connects to your charm over Bluetooth to check battery and start transfers."
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: "Tucklet moves your photos over a private local Wi-Fi link to your charm."
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Tucklet backs up and restores your photos and videos."
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "Tucklet saves restored photos and videos back to your library."
       configs:
         debug: {}
         release: {}
@@ -51,6 +52,9 @@ targets:
         # are declared here in production — CONFIRM the Info.plist keys against
         # the iOS 26 SDK docs.
         NSAccessorySetupKitSupports: ["Bluetooth", "WiFiAware"]
+        # Background trickle backup:
+        BGTaskSchedulerPermittedIdentifiers: ["app.tucklet.trickle"]
+        UIBackgroundModes: ["processing", "fetch"]
 
   TuckletFileProvider:
     type: app-extension

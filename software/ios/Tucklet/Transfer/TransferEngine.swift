@@ -22,19 +22,25 @@ public final class TransferEngine: ObservableObject {
         TransferEstimator.estimate(sizes: items.map(\.sizeBytes), link: link)
     }
 
-    /// Run a batch transfer, updating `progress` (with a live ETA) as it goes.
-    /// `loadDestination` provides a local file URL for each Load item; for
-    /// Offload, `offloadSource` provides the local file to upload.
-    public func runBatch(_ request: TransferRequest,
-                         offloadSource: ((TransferItem) -> URL)? = nil,
-                         loadDestination: ((TransferItem) -> URL)? = nil,
-                         origin: OriginMetadata? = nil) async {
+    /// Run a batch transfer, updating `progress` (with a live ETA recomputed
+    /// from measured throughput) as it goes. The caller supplies `perItem`,
+    /// which does the real async work for one item:
+    ///   * offload -> export the phone original + upload it
+    ///   * load    -> download it + save it back to Photos
+    /// On success of an offload batch, `completedIds` is the list the caller can
+    /// hand to `finishOffload` (delete + Undo).
+    @discardableResult
+    public func runBatch(
+        _ request: TransferRequest,
+        perItem: @escaping (TransferItem) async throws -> Void
+    ) async -> [String] {
         isRunning = true; lastError = nil
         defer { isRunning = false }
 
         let bytesTotal = request.items.reduce(UInt64(0)) { $0 &+ $1.sizeBytes }
         var bytesDone: UInt64 = 0
         var itemsDone: UInt32 = 0
+        var completed: [String] = []
         let start = Date()
 
         // Seed with the static estimate so the UI shows a number immediately.
@@ -45,19 +51,12 @@ public final class TransferEngine: ObservableObject {
 
         for item in request.items {
             do {
-                switch request.kind {
-                case .load:
-                    guard let dest = loadDestination?(item) else { continue }
-                    try await data.download(id: item.id, to: dest)
-                case .offload:
-                    guard let src = offloadSource?(item), let org = origin else { continue }
-                    try await data.upload(fileURL: src, origin: org)
-                }
+                try await perItem(item)
             } catch {
                 lastError = error.localizedDescription
-                return
+                break
             }
-
+            completed.append(item.id)
             bytesDone &+= item.sizeBytes
             itemsDone += 1
 
@@ -70,6 +69,7 @@ public final class TransferEngine: ObservableObject {
                                         bytesTotal: bytesTotal, bytesDone: bytesDone,
                                         etaSeconds: eta, throughputBps: measuredBps)
         }
+        return completed
     }
 }
 

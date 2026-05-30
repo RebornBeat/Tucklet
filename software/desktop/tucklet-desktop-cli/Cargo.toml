@@ -1,0 +1,13 @@
+[package]
+name = "tucklet-desktop-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line Tucklet client over the /v1 wireless API."
+license-file = "../../../LICENSE-SOFTWARE.txt"
+
+[[bin]]
+name = "tucklet"
+path = "src/main.rs"
+
+[dependencies]
+tucklet-desktop-core = { path = "../tucklet-desktop-core" }

@@ -371,6 +371,114 @@ pub mod variant {
 }
 
 // ===========================================================================
+// session — single-use transport credentials + TTL (pure, host-testable)
+// ===========================================================================
+pub mod session {
+    use alloc::string::String;
+    use alloc::format;
+    use tucklet_proto::{DataTransport, EpochSeconds, SessionGrant};
+
+    /// Default lifetime of a transfer session's credentials, in seconds.
+    pub const DEFAULT_TTL_S: u32 = 600;
+
+    /// A live transfer session. The firmware mints one per authorized transfer,
+    /// hands the `SessionGrant` to the phone over BLE, brings up the data path,
+    /// and tears everything down when the session expires or completes.
+    ///
+    /// Credentials are single-use and short-lived: a captured SoftAP password
+    /// is worthless once the session ends (see PROTOCOL §4).
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub struct Session {
+        pub token: String,
+        pub ssid_or_service: String,
+        pub psk: String,
+        pub ip: String,
+        pub transport: DataTransport,
+        pub issued_at: EpochSeconds,
+        pub ttl_s: u32,
+    }
+
+    impl Session {
+        /// Mint a new session. `rand16` supplies 16 random bytes (from the
+        /// hardware RNG on-device); kept as a parameter so this is pure and
+        /// testable. The IP is fixed for SoftAP (the device's AP gateway).
+        pub fn mint(
+            transport: DataTransport,
+            now: EpochSeconds,
+            rand16: [u8; 16],
+            ttl_s: u32,
+        ) -> Self {
+            let hex = hex16(&rand16);
+            // SSID is short + human-recognizable; PSK + token are full entropy.
+            let suffix = &hex[..4];
+            let ssid_or_service = match transport {
+                DataTransport::WifiAware => format!("tucklet.{suffix}"),
+                _ => format!("Tucklet-{suffix}"),
+            };
+            Session {
+                token: format!("tk_{hex}"),
+                ssid_or_service,
+                psk: format!("{hex}{hex}")[..16].into(), // 16-char one-time PSK
+                ip: String::from("192.168.4.1"),
+                transport,
+                issued_at: now,
+                ttl_s,
+            }
+        }
+
+        /// Is the session still valid at `now`?
+        pub fn is_valid(&self, now: EpochSeconds) -> bool {
+            now >= self.issued_at && (now - self.issued_at) < self.ttl_s as i64
+        }
+
+        /// Seconds left before expiry (0 once expired).
+        pub fn remaining_s(&self, now: EpochSeconds) -> u32 {
+            let elapsed = (now - self.issued_at).max(0);
+            (self.ttl_s as i64 - elapsed).max(0) as u32
+        }
+
+        /// Does a presented bearer token match this session (and is it valid)?
+        pub fn authorize(&self, presented_token: &str, now: EpochSeconds) -> bool {
+            self.is_valid(now) && constant_time_eq(self.token.as_bytes(), presented_token.as_bytes())
+        }
+
+        /// The wire grant handed to the phone over BLE.
+        pub fn grant(&self) -> SessionGrant {
+            SessionGrant {
+                ssid_or_service: self.ssid_or_service.clone(),
+                psk: self.psk.clone(),
+                ip: self.ip.clone(),
+                token: self.token.clone(),
+                ttl_seconds: self.remaining_s(self.issued_at), // == ttl at issue
+            }
+        }
+    }
+
+    fn hex16(b: &[u8; 16]) -> String {
+        let mut s = String::with_capacity(32);
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        for &byte in b.iter() {
+            s.push(HEX[(byte >> 4) as usize] as char);
+            s.push(HEX[(byte & 0x0f) as usize] as char);
+        }
+        s
+    }
+
+    /// Length-independent-ish constant-time compare (avoids early-exit timing
+    /// leaks on the token check). Both sides are short fixed tokens.
+    fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+        if a.len() != b.len() {
+            return false;
+        }
+        let mut diff = 0u8;
+        for i in 0..a.len() {
+            diff |= a[i] ^ b[i];
+        }
+        diff == 0
+    }
+}
+
+// ===========================================================================
 // tests
 // ===========================================================================
 #[cfg(test)]
@@ -540,5 +648,49 @@ mod tests {
         let desk = variant::usable_transports(&caps, Platform::Desktop);
         assert!(!desk.contains(&DataTransport::WifiAware));
         assert!(desk.contains(&DataTransport::WiredUsbHs));
+    }
+
+    // ---- session credentials ----------------------------------------------
+    #[test]
+    fn session_mint_and_validity_window() {
+        use session::Session;
+        use tucklet_proto::DataTransport;
+        let r = [0xABu8; 16];
+        let s = Session::mint(DataTransport::SoftAp, 1000, r, session::DEFAULT_TTL_S);
+        assert!(s.ssid_or_service.starts_with("Tucklet-"));
+        assert_eq!(s.psk.len(), 16);
+        assert!(s.token.starts_with("tk_"));
+        // valid at issue, valid just before expiry, invalid at/after expiry
+        assert!(s.is_valid(1000));
+        assert!(s.is_valid(1000 + session::DEFAULT_TTL_S as i64 - 1));
+        assert!(!s.is_valid(1000 + session::DEFAULT_TTL_S as i64));
+        // not valid "before" it was issued (clock skew guard)
+        assert!(!s.is_valid(999));
+        assert_eq!(s.remaining_s(1000), session::DEFAULT_TTL_S);
+        assert_eq!(s.remaining_s(1000 + 100), session::DEFAULT_TTL_S - 100);
+        assert_eq!(s.remaining_s(1_000_000), 0);
+    }
+
+    #[test]
+    fn session_token_authorization_is_exact() {
+        use session::Session;
+        use tucklet_proto::DataTransport;
+        let s = Session::mint(DataTransport::SoftAp, 0, [1u8; 16], 600);
+        assert!(s.authorize(&s.token, 10));
+        assert!(!s.authorize("tk_wrong", 10));
+        assert!(!s.authorize(&s.token, 10_000)); // expired
+        // grant mirrors the session
+        let g = s.grant();
+        assert_eq!(g.token, s.token);
+        assert_eq!(g.ip, "192.168.4.1");
+        assert_eq!(g.ttl_seconds, 600);
+    }
+
+    #[test]
+    fn session_aware_uses_service_name() {
+        use session::Session;
+        use tucklet_proto::DataTransport;
+        let s = Session::mint(DataTransport::WifiAware, 0, [0x5Au8; 16], 600);
+        assert!(s.ssid_or_service.starts_with("tucklet."));
     }
 }
