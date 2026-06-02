@@ -3,12 +3,12 @@
 Tucklet hardware generator — the parametric "recipe" for every board variant.
 
 This is the single source of truth for the electrical design. Running it emits,
-for each physical board variant (radio x storage), a complete set of build
+for each physical board variant (radio x storage x form_factor), a complete set of build
 artifacts under variants/<name>/:
 
     SPEC.md              human spec for this exact board
     BOM.csv              bill of materials for this exact board
-    PIN_MAP.md           signal -> ESP32-C5 pin mapping (datasheet step flagged)
+    PIN_MAP.md           signal -> MCU pin mapping (datasheet step flagged)
     SCHEMATIC_PLAN.md    net-by-net connection plan
     tucklet-<name>.net   KiCad-importable netlist (Pcbnew: File > Import Netlist)
     block_diagram.svg    per-variant system block diagram
@@ -22,13 +22,9 @@ re-run to regenerate every variant consistently.
 
 HONESTY NOTE ON PIN NUMBERS: discrete ICs with fixed, well-known pinouts
 (MCP73831, MAX17048, USB-C receptacle, CC resistors) use real pin numbers.
-The ESP32-C5-WROOM-1 module's GPIO assignments are expressed as SIGNAL NAMES,
-because the exact module pin numbers must be read from the current
-ESP32-C5-WROOM-1 datasheet and must avoid the strapping pins. The netlist is a
-"logical" netlist in the KiCad sense: nodes reference signal names, and the
-PIN_MAP documents the signal->physical-pin reconciliation you do once in KiCad.
-This is deliberate — fabricating exact module pin numbers would be a lie that
-costs a board respin.
+The MCU module's GPIO assignments are expressed as SIGNAL NAMES,
+because the exact module pin numbers must be read from the current datasheet.
+The netlist is a "logical" netlist in the KiCad sense.
 
 License: CC BY-NC-SA 4.0 (hardware design files).
 """
@@ -46,9 +42,13 @@ from typing import Optional
 # Variant model
 # ---------------------------------------------------------------------------
 
+# Radio definitions now include Chip Type derivation
+# "label", "radios", "wireless_mb_s", "chip"
 RADIOS = {
-    "singlec5": {"label": "Single ESP32-C5", "radios": 1, "wireless_mb_s": 9},
-    "dualc5":   {"label": "Dual ESP32-C5 (link-aggregated, experimental)", "radios": 2, "wireless_mb_s": 15},
+    "singlec5": {"label": "Single ESP32-C5", "radios": 1, "wireless_mb_s": 9, "chip": "c5"},
+    "dualc5":   {"label": "Dual ESP32-C5 (link-aggregated, experimental)", "radios": 2, "wireless_mb_s": 15, "chip": "c5"},
+    "singlee22": {"label": "Single ESP32-E22 (Wi-Fi 6E)", "radios": 1, "wireless_mb_s": 150, "chip": "e22"},
+    "duale22":   {"label": "Dual ESP32-E22 (High-Performance)", "radios": 2, "wireless_mb_s": 300, "chip": "e22"},
 }
 
 # eMMC capacities offered; cost is a small-volume commercial estimate (VERIFY on
@@ -61,6 +61,11 @@ STORAGE = {
     "emmc":    {"label": "eMMC (sealed)", "kind": "Emmc"},
 }
 
+FORM_FACTORS = {
+    "wroom": {"label": "Standard (WROOM)", "size_note": "Standard footprint"},
+    "mini":  {"label": "Mini (Compact)", "size_note": "Ultra-compact footprint"},
+}
+
 # Enclosure envelopes (mm) from mechanical/ and docs/TRANSFER_PERFORMANCE.md.
 ENVELOPE = {
     "microsd": (35, 28, 9),
@@ -70,12 +75,13 @@ ENVELOPE = {
 
 @dataclass
 class Variant:
-    radio: str       # "singlec5" | "dualc5"
+    radio: str       # "singlec5" | "dualc5" | "singlee22" | "duale22"
     storage: str     # "microsd" | "emmc"
+    form_factor: str # "wroom" | "mini"
 
     @property
     def name(self) -> str:
-        return f"{self.radio}-{self.storage}"
+        return f"{self.radio}-{self.form_factor}-{self.storage}"
 
     @property
     def radios(self) -> int:
@@ -93,8 +99,17 @@ class Variant:
     def wireless_mb_s(self) -> int:
         return RADIOS[self.radio]["wireless_mb_s"]
 
+    @property
+    def chip(self) -> str:
+        return RADIOS[self.radio]["chip"]
 
-ALL_VARIANTS = [Variant(r, s) for r in RADIOS for s in STORAGE]
+    @property
+    def is_e22(self) -> bool:
+        return self.chip == "e22"
+
+
+# Generate ALL variants: 4 Radio configs x 2 Storage x 2 Form Factors = 16 Variants
+ALL_VARIANTS = [Variant(r, s, f) for r in RADIOS for s in STORAGE for f in FORM_FACTORS]
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +136,22 @@ def build_components(v: Variant) -> list[Comp]:
     c: list[Comp] = []
 
     # --- U1 radio/MCU (signal-named pins) ---
+    # Logic to select specific MCU part
+    if v.chip == "e22":
+        base_val = "ESP32-E22"
+        base_mpn = "ESP32-E22-WROOM-1" if v.form_factor == "wroom" else "ESP32-E22-MINI-1"
+        # E22 Footprints (Hypothetical standard names - User must verify/create)
+        base_fp = "RF_Module:Espressif_ESP32-E22_WROOM-1" if v.form_factor == "wroom" else "RF_Module:Espressif_ESP32-E22_MINI-1"
+        mcu_desc = "Wi-Fi 6E + BLE 5.4 Radio Co-Processor (MCU mode)"
+        mcu_cost = 4.50 if v.form_factor == "wroom" else 4.20
+    else: # C5
+        base_val = "ESP32-C5-WROOM-1" if v.form_factor == "wroom" else "ESP32-C5-MINI-1"
+        base_mpn = f"{base_val}-N8"
+        # Using S3 footprint as proxy for C5 (standard hacking practice until libs update)
+        base_fp = "RF_Module:ESP32-S3-WROOM-1" if v.form_factor == "wroom" else "RF_Module:ESP32-S3-WROOM-1" # Mini footprint mapping TBD
+        mcu_desc = "Wi-Fi 6 dual-band + BLE module (radio/MCU)"
+        mcu_cost = 2.60 if v.form_factor == "wroom" else 2.40
+
     radio_pins = [
         ("GND", "GND", "power_in"),
         ("3V3", "VDD", "power_in"),
@@ -144,24 +175,23 @@ def build_components(v: Variant) -> list[Comp]:
     if v.storage == "microsd":
         radio_pins.append(("SD_DET", "GPIO_SDDET", "input"))
     if v.is_dual:
-        # Aggregation link crosses over: U1 TX -> U1B RX (net AGG_A),
-        # U1B TX -> U1 RX (net AGG_B).
+        # Aggregation link
         radio_pins += [("AGG_TX", "AGG_A", "output"), ("AGG_RX", "AGG_B", "input")]
-    c.append(Comp("U1", "ESP32-C5-WROOM-1", "RF_Module:ESP32-S3-WROOM-1",
-                  "Wi-Fi 6 dual-band + BLE module (radio/MCU)",
-                  pins=radio_pins, unit_cost=2.60, mpn="ESP32-C5-WROOM-1-N8"))
+
+    c.append(Comp("U1", base_val, base_fp, mcu_desc,
+                  pins=radio_pins, unit_cost=mcu_cost, mpn=base_mpn))
 
     if v.is_dual:
         radio2_pins = [
             ("GND", "GND", "power_in"),
             ("3V3", "VDD", "power_in"),
             ("EN", "EN", "input"),
-            ("AGG_RX", "AGG_A", "input"),   # U1B receives what U1 transmits
-            ("AGG_TX", "AGG_B", "output"),  # U1B transmits to U1's receiver
+            ("AGG_RX", "AGG_A", "input"),
+            ("AGG_TX", "AGG_B", "output"),
         ]
-        c.append(Comp("U1B", "ESP32-C5-WROOM-1", "RF_Module:ESP32-S3-WROOM-1",
-                      "Second radio for link aggregation (experimental)",
-                      pins=radio2_pins, unit_cost=2.60, mpn="ESP32-C5-WROOM-1-N8"))
+        c.append(Comp("U1B", base_val, base_fp,
+                      "Second radio for link aggregation",
+                      pins=radio2_pins, unit_cost=mcu_cost, mpn=base_mpn))
 
     # --- U2 USB-HS storage bridge (real-ish pinout, generic) ---
     c.append(Comp("U2", "USB2.0-HS SD/eMMC bridge", "Package_DFN_QFN:QFN-24",
@@ -178,17 +208,17 @@ def build_components(v: Variant) -> list[Comp]:
                       ("9", "SD_D1", "bidirectional"),
                       ("10", "SD_D2", "bidirectional"),
                       ("11", "SD_D3", "bidirectional"),
-                      ("12", "SD_SEL", "input"),  # senses/handshakes ownership
+                      ("12", "SD_SEL", "input"),
                   ], unit_cost=1.60, mpn="GL3224-OEM (or RTS5306-class)"))
 
     # --- U3 charger MCP73831 (real pinout, SOT-23-5) ---
     c.append(Comp("U3", "MCP73831", "Package_TO_SOT_SMD:SOT-23-5",
                   "Single-cell Li-ion/LiPo charge management",
                   pins=[
-                      ("1", "STAT", "open_collector"),  # -> CHG_STAT
-                      ("2", "VSS", "power_in"),          # GND
-                      ("3", "VBAT", "power_out"),        # battery
-                      ("4", "VDD", "power_in"),          # VBUS
+                      ("1", "STAT", "open_collector"),
+                      ("2", "VSS", "power_in"),
+                      ("3", "VBAT", "power_out"),
+                      ("4", "VDD", "power_in"),
                       ("5", "PROG", "passive"),
                   ], unit_cost=0.50, mpn="MCP73831T-2ACI/OT"))
 
@@ -196,38 +226,49 @@ def build_components(v: Variant) -> list[Comp]:
     c.append(Comp("U4", "MAX17048", "Package_DFN_QFN:TDFN-8-1EP_3x3mm",
                   "I2C fuel gauge (real battery percent)",
                   pins=[
-                      ("1", "VDD", "power_in"),          # 3V3
+                      ("1", "VDD", "power_in"),
                       ("2", "CTG", "passive"),
                       ("3", "QSTRT", "input"),
                       ("4", "GND", "power_in"),
-                      ("5", "ALRT", "open_collector"),   # -> GAUGE_ALRT
-                      ("6", "SCL", "input"),             # I2C_SCL
-                      ("7", "SDA", "bidirectional"),     # I2C_SDA
-                      ("8", "CELL", "passive"),          # VBAT sense
+                      ("5", "ALRT", "open_collector"),
+                      ("6", "SCL", "input"),
+                      ("7", "SDA", "bidirectional"),
+                      ("8", "CELL", "passive"),
                   ], unit_cost=0.80, mpn="MAX17048G+T10"))
 
-    # --- U5 buck 3V3 (generic, sized for radio peak; dual needs more) ---
-    buck_cost = 0.55 if v.is_dual else 0.40
-    buck_val = "3V3 buck (>=1A for dual)" if v.is_dual else "3V3 buck (>=600mA)"
+    # --- U5 buck 3V3 (sized for radio peak) ---
+    # E22 requires significantly more power (Dual core 500MHz + 6E Radio)
+    if v.is_e22:
+        buck_cost = 1.20
+        buck_val = "3V3 buck (>=2A for E22)"
+        buck_mpn = "TPS62840-class"
+    elif v.is_dual:
+        buck_cost = 0.55
+        buck_val = "3V3 buck (>=1A for dual)"
+        buck_mpn = "TPS62740-class"
+    else:
+        buck_cost = 0.40
+        buck_val = "3V3 buck (>=600mA)"
+        buck_mpn = "TPS62740-class"
+
     c.append(Comp("U5", buck_val, "Package_TO_SOT_SMD:SOT-23-6",
                   "Step-down regulator, sized for Wi-Fi TX peak",
                   pins=[
-                      ("1", "VIN", "power_in"),    # VBAT
+                      ("1", "VIN", "power_in"),
                       ("2", "GND", "power_in"),
                       ("3", "EN", "input"),
                       ("4", "FB", "passive"),
                       ("5", "SW", "passive"),
-                      ("6", "VOUT", "power_out"),  # 3V3
-                  ], unit_cost=buck_cost, mpn="TPS62740-class"))
+                      ("6", "VOUT", "power_out"),
+                  ], unit_cost=buck_cost, mpn=buck_mpn))
 
     # --- U6 SD bus mux / ownership handoff ---
     c.append(Comp("U6", "SD 2:1 bus mux", "Package_DFN_QFN:QFN-20",
                   "Arbitrates microSD/eMMC bus between radio (A) and bridge (B)",
                   pins=[
-                      ("SEL", "SEL", "input"),         # SD_SEL
+                      ("SEL", "SEL", "input"),
                       ("GND", "GND", "power_in"),
                       ("VCC", "3V3", "power_in"),
-                      # common (to storage)
                       ("C_CLK", "SD_CLK", "bidirectional"),
                       ("C_CMD", "SD_CMD", "bidirectional"),
                       ("C_D0", "SD_D0", "bidirectional"),
@@ -335,10 +376,13 @@ def build_components(v: Variant) -> list[Comp]:
                       note="capacity & cost set per SKU; 64GB shown as default"))
 
     # --- Battery connector / cell ---
-    c.append(Comp("BT1", "LiPo 120-200mAh + PCM", "Connector:Conn_01x02_Pin",
+    # E22 requires larger battery
+    batt_desc = "LiPo 300-500mAh + PCM" if v.is_e22 else "LiPo 120-200mAh + PCM"
+    batt_cost = 3.50 if v.is_e22 else 2.00
+    c.append(Comp("BT1", batt_desc, "Connector:Conn_01x02_Pin",
                   "Single-cell LiPo with protection circuit",
                   pins=[("1", "VBAT", "power_out"), ("2", "GND", "power_in")],
-                  unit_cost=2.00, mpn="cell + JST-ACH or solder pads"))
+                  unit_cost=batt_cost, mpn="cell + JST-ACH or solder pads"))
 
     # --- Bulk/decoupling (grouped, representative) ---
     c.append(Comp("C_GRP", "decoupling+bulk (grouped)", "Capacitor_SMD:C_0402_1005Metric",
@@ -350,17 +394,13 @@ def build_components(v: Variant) -> list[Comp]:
 
 
 def build_nets(v: Variant, comps: list[Comp]) -> dict[str, list[tuple[str, str]]]:
-    """Collect nets by walking each component's pins. A net is named by the
-    signal; nodes are (ref, pin-identifier). Pins whose function starts with
-    'NC_' are left unconnected."""
+    """Collect nets by walking each component's pins."""
     nets: dict[str, list[tuple[str, str]]] = {}
     for comp in comps:
         for (pinid, signal, _ptype) in comp.pins:
             if signal.startswith("NC_"):
                 continue
             nets.setdefault(signal, []).append((comp.ref, pinid))
-    # Drop single-node nets that are truly point features (none expected here,
-    # but guard against typos creating dangling 1-pin nets).
     return nets
 
 
@@ -369,9 +409,7 @@ def build_nets(v: Variant, comps: list[Comp]) -> dict[str, list[tuple[str, str]]
 # ---------------------------------------------------------------------------
 
 def emit_kicad_netlist(v: Variant, comps: list[Comp], nets: dict) -> str:
-    """Emit a KiCad-format (version 'E') netlist. Importable via Pcbnew >
-    File > Import Netlist (logical netlist: pin ids are signal names for the
-    module; reconcile via PIN_MAP)."""
+    """Emit a KiCad-format (version 'E') netlist."""
     out = io.StringIO()
     out.write('(export (version "E")\n')
     out.write('  (design\n')
@@ -383,7 +421,7 @@ def emit_kicad_netlist(v: Variant, comps: list[Comp], nets: dict) -> str:
     out.write('  (components\n')
     for cph in comps:
         if cph.ref == "C_GRP":
-            continue  # grouped passive: BOM-only, not a netlist node
+            continue
         out.write(f'    (comp (ref "{cph.ref}")\n')
         out.write(f'      (value "{cph.value}")\n')
         out.write(f'      (footprint "{cph.footprint}")\n')
@@ -421,7 +459,7 @@ def emit_bom(v: Variant, comps: list[Comp]) -> str:
         total += line
         w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
                     f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
-    # PCB + enclosure rows (full BOM, not just electronics)
+    # PCB + enclosure rows
     w.writerow(["PCB", 1, "2-4 layer board", "", "", "1.50", "1.50", "Small board, volume pricing", ""])
     w.writerow(["ENC", 1, "enclosure (3D-print early)", "", "", "2.00", "2.00",
                 f"{ENVELOPE[v.storage][0]}x{ENVELOPE[v.storage][1]}x{ENVELOPE[v.storage][2]}mm shell", "molding tooling is separate capex"])
@@ -438,7 +476,7 @@ def emit_pin_map(v: Variant) -> str:
     dual = ""
     if v.is_dual:
         dual = """
-## Second radio (U1B) + aggregation link (DualC5 only)
+## Second radio (U1B) + aggregation link (Dual Radio only)
 | Signal | Role | Pin (U1 / U1B) | Notes |
 |---|---|---|---|
 | AGG_TX / AGG_RX | radio<->radio coordination | free UART pair | U1.AGG_TX -> U1B.AGG_RX and vice-versa |
@@ -450,23 +488,23 @@ def emit_pin_map(v: Variant) -> str:
 | EMMC_RST | eMMC hardware reset | free GPIO | drive per JEDEC reset timing |
 | (DAT4..DAT7) | optional 8-bit eMMC | free GPIOs | only if bridge + layout support 8-bit; raises wired throughput |
 """
-    return f"""# Pin Map — {v.name} (ESP32-C5-WROOM-1)
+
+    chip_name = "ESP32-E22" if v.is_e22 else "ESP32-C5"
+
+    return f"""# Pin Map — {v.name} ({chip_name})
 
 > **Read this first.** GPIO numbers are NOT hard-coded here because the
-> ESP32-C5-WROOM-1 pin table must be taken from the **current datasheet**, and
-> the C5 map differs from the S3. Assign each signal below to a free C5 GPIO,
-> keeping the **strapping pins clean** (do not load boot-strap pins with
-> peripherals that disturb boot). This one reconciliation step turns the
-> logical netlist into a routable schematic.
+> {chip_name} pin table must be taken from the **current datasheet**.
+> Assign each signal below to a free GPIO, keeping the **strapping pins clean**.
 
 ## Fixed-function (must use the dedicated pins)
-| Signal | Function | C5 pin | Notes |
+| Signal | Function | Pin | Notes |
 |---|---|---|---|
 | USB_DP / USB_DM | native USB (flashing/JTAG; NOT the data path) | dedicated USB pins | route to test pads; storage data goes through the USB-HS bridge instead |
 | 3V3 / GND / EN | power + enable | dedicated | EN via RC reset network |
 
 ## Storage bus — SDIO 4-bit (shared via U6 mux)
-| Signal | Function | C5 pin | Notes |
+| Signal | Function | Pin | Notes |
 |---|---|---|---|
 | SD_CLK | SDIO clock | free GPIO | to U6 A-side |
 | SD_CMD | SDIO command | free GPIO | 10k pull-up |
@@ -474,21 +512,21 @@ def emit_pin_map(v: Variant) -> str:
 | SD_SEL | storage ownership select | free GPIO | drives U6; high=bridge owns (USB plugged), low=radio owns |{det}{emmc_extra}
 
 ## I2C (fuel gauge U4)
-| Signal | Function | C5 pin | Notes |
+| Signal | Function | Pin | Notes |
 |---|---|---|---|
 | I2C_SDA | I2C data | free GPIO | 4.7k pull-up |
 | I2C_SCL | I2C clock | free GPIO | 4.7k pull-up |
 | GAUGE_ALRT | low-battery interrupt | free GPIO | from MAX17048 ALRT (open-drain) |
 
 ## UI + charger status
-| Signal | Function | C5 pin | Notes |
+| Signal | Function | Pin | Notes |
 |---|---|---|---|
 | BTN | tactile button | free GPIO | 10k pull-up + firmware debounce; press patterns = pair / factory-reset |
 | LED_DIN | WS2812 data | free GPIO | single addressable RGB |
 | CHG_STAT | charger status | free GPIO | from MCP73831 STAT (open-drain) |
 {dual}
 ## Routing note
-Wi-Fi 5 GHz TX bursts are the current peak. Wide copper on VBUS/VBAT/3V3, bulk +
+Wi-Fi {'6E' if v.is_e22 else '5 GHz'} TX bursts are the current peak. Wide copper on VBUS/VBAT/3V3, bulk +
 decoupling close to U1 (and U1B on dual), and size U5 for the peak, not the
 average — this prevents mid-transfer brownout resets.
 """
@@ -502,7 +540,7 @@ def emit_schematic_plan(v: Variant, nets: dict) -> str:
              "board with a ratsnest directly (logical netlist; reconcile module pins",
              "via PIN_MAP.md).",
              "",
-             f"Variant: **{RADIOS[v.radio]['label']}**, **{STORAGE[v.storage]['label']}** storage.",
+             f"Variant: **{RADIOS[v.radio]['label']}**, **{STORAGE[v.storage]['label']}**, **{FORM_FACTORS[v.form_factor]['label']}**.",
              "",
              "## Power tree",
              "`VBUS` (USB-C) -> U3 charge in; `VBAT` (BT1 <-> U3 BAT <-> U4 CELL <-> U5 VIN);",
@@ -535,102 +573,88 @@ def emit_schematic_plan(v: Variant, nets: dict) -> str:
 
 def emit_spec(v: Variant) -> str:
     ex, ey, ez = ENVELOPE[v.storage]
-    # storage section
+
+    # Dynamic sections based on variant
     if v.is_emmc:
-        cap_rows = "\n".join(
-            f"| {g} GB | ~${EMMC_COST[g]:.2f} | sealed |" for g in EMMC_CAPACITIES_GIB)
+        cap_rows = "\n".join(f"| {g} GB | ~${EMMC_COST[g]:.2f} | sealed |" for g in EMMC_CAPACITIES_GIB)
         storage_block = f"""## Storage — eMMC (sealed, per-SKU capacity)
 153-ball TFBGA eMMC 5.1, 11.5 x 13.0 x 1.2 mm. Capacity is fixed at manufacture.
 
 | Capacity | eMMC est. cost | Notes |
 |---|---|---|
 {cap_rows}
-
-Only the 8-16 GB SKUs keep the full BOM near the sub-$15 target; higher
-capacities cost more because flash costs money. This is the slim/sealed premium
-line. Requires BGA assembly (CM with reflow + ideally X-ray)."""
+"""
     else:
         storage_block = """## Storage — microSD (swappable)
-Push-push microSD socket, SDIO 4-bit. Customer supplies/upgrades the card; you
-don't pay for the flash. A dead card is a $5 swap, not a dead device. Slightly
-larger enclosure than eMMC (socket + insertion clearance), internal behind a
-small door so the device still looks sealed day-to-day."""
+Push-push microSD socket, SDIO 4-bit. Customer supplies/upgrades the card.
+"""
+
+    if v.is_e22:
+        chip_block = f"""
+## Radio — ESP32-E22 (Wi-Fi 6E)
+Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
+**High Performance:** ~{v.wireless_mb_s} MB/s theoretical wireless throughput.
+**Power:** Requires larger battery and robust 3.3V regulation (U5).
+**Thermal:** High sustained throughput generates heat; monitor enclosure temps.
+"""
+    else:
+        chip_block = f"""
+## Radio — ESP32-C5
+Dual-band Wi-Fi 6 (2.4 + 5 GHz) + BLE. ~{v.wireless_mb_s} MB/s wireless at close range.
+"""
 
     dual_block = ""
     if v.is_dual:
         dual_block = """
-## Radio — Dual ESP32-C5 (experimental link aggregation)
-Two C5 radios with app-layer striping / MPTCP for ~13-16 MB/s wireless. The hard
-part is RF isolation of two 5 GHz antennas inside the shell (orthogonal
-placement + polarization). **Validate antenna isolation on a prototype before
-committing the enclosure.** Needs a larger battery and a U5 sized for two radios.
-"""
-    else:
-        dual_block = """
-## Radio — Single ESP32-C5
-One dual-band Wi-Fi 6 (2.4 + 5 GHz) + BLE module. ~9 MB/s wireless at close
-range (the charm sits on the phone, so the link is centimeters long and sustains
-top modulation). BLE is the control/auth plane; Wi-Fi is the data plane.
+**Note:** Dual-radio link aggregation is experimental. Validate RF isolation between antennas.
 """
 
     return f"""# Variant Spec — {v.name}
 
-**{RADIOS[v.radio]['label']} + {STORAGE[v.storage]['label']}**
+**{RADIOS[v.radio]['label']} + {STORAGE[v.storage]['label']} ({FORM_FACTORS[v.form_factor]['label']})**
 
 ## What this board is
 A Tucklet build with the {RADIOS[v.radio]['label'].lower()} radio and
-{STORAGE[v.storage]['label'].lower()} storage. It shares the entire common
-design (USB-C charge, MCP73831 charger, MAX17048 fuel gauge, 3V3 buck, USB-HS
-storage bridge, SD mux, button, RGB LED) with the other variants; only the
-{'radio count and ' if v.is_dual else ''}storage block differs.
-
-## Connectivity (all variants support the full layered stack)
-- **BLE** — discovery, auth, battery %, free space, wake. Always on (low duty).
-- **Wi-Fi SoftAP** — universal wireless data path (works on every phone today).
-- **Wi-Fi Aware (NAN)** — seamless wireless path where the firmware feature is
-  enabled and the device is certified (see docs/FINAL_REVIEW.md). Same radio, so
-  same throughput as SoftAP; it improves *seamlessness*, not speed.
-- **USB-HS wired bridge** — ~20-40 MB/s when plugged in (U2 owns storage).
-
-Transport support is a firmware feature flag, not a board change — every board
-can run SoftAP-only or SoftAP+Aware. See docs/VARIANT_MATRIX.md.
-{dual_block}
+{STORAGE[v.storage]['label'].lower()} storage in a {FORM_FACTORS[v.form_factor]['label']} form factor.
+{chip_block}{dual_block}
 {storage_block}
 
 ## Performance
-- Everyday wireless (close range): **~{v.wireless_mb_s} MB/s**.
+- Everyday wireless: **~{v.wireless_mb_s} MB/s**.
 - Bulk wired (USB-HS bridge): **~20-40 MB/s**.
-- Do NOT market the radio's own USB path (~0.5 MB/s, unused; see TRANSFER_PERFORMANCE).
 
 ## Dimensions
-Enclosure envelope: **{ex} x {ey} x {ez} mm** (AirTag-class). The ESP32-C5 module
-is the footprint driver; the battery is the thickness driver. Adding the USB-HS
-bridge ({'+ second radio + two antennas' if v.is_dual else ''}) does not change
-the envelope class{' beyond requiring two-antenna isolation validation' if v.is_dual else ''}.
+Enclosure envelope: **{ex} x {ey} x {ez} mm** (AirTag-class).
 
 ## Files in this directory
-- `BOM.csv` — full bill of materials (electronics + PCB + enclosure).
-- `PIN_MAP.md` — signal -> C5 pin reconciliation (datasheet step flagged).
-- `SCHEMATIC_PLAN.md` — net-by-net connection plan.
-- `tucklet-{v.name}.net` — KiCad-importable netlist (Pcbnew > Import Netlist).
-- `block_diagram.svg` — this variant's block diagram.
+- `BOM.csv` — Full bill of materials.
+- `PIN_MAP.md` — Signal -> MCU pin mapping.
+- `SCHEMATIC_PLAN.md` — Net-by-net connection plan.
+- `tucklet-{v.name}.net` — KiCad logical netlist.
+- `block_diagram.svg` — System diagram.
 
-## Bring-up checklist (settle on real silicon)
-- [ ] Reconcile signal->GPIO from the ESP32-C5-WROOM-1 datasheet (PIN_MAP).
-- [ ] Confirm the USB-HS bridge part number + its SD shared-bus/handoff mode.
-- [ ] Validate SDIO timing to the {'eMMC' if v.is_emmc else 'microSD card'}.
-- [ ] Measure real 5 GHz transfer current; size BT1 cell.
-{'- [ ] Validate two-antenna RF isolation before finalizing the enclosure.' if v.is_dual else ''}
-- [ ] FCC/CE (radios present); Wi-Fi Alliance cert only if shipping Aware on iOS.
+## Bring-up checklist
+- [ ] Reconcile signal->GPIO from the datasheet (PIN_MAP).
+- [ ] Confirm USB-HS bridge part number + handoff mode.
+- [ ] Validate SDIO timing.
+- [ ] Measure real TX current; size BT1 cell.
+- [ ] FCC/CE certification required (radios present).
 """
 
 
 def emit_block_svg(v: Variant) -> str:
     """A compact, variant-specific block diagram."""
     storage_label = "microSD (J2)" if v.storage == "microsd" else "eMMC (XU7)"
-    radio_label = "ESP32-C5 (U1)" if not v.is_dual else "ESP32-C5 x2 (U1/U1B)"
-    radio_sub = "BLE + Wi-Fi 5GHz" if not v.is_dual else "BLE + 2x Wi-Fi (aggregated)"
-    dual_note = "" if not v.is_dual else '<text x="430" y="200" text-anchor="middle" font-size="10" fill="#b5654f" font-style="italic">+ U1B, AGG link, 2 antennas</text>'
+    # Construct Radio Label based on variant
+    if v.is_e22:
+        radio_label = "ESP32-E22 (U1)" if not v.is_dual else "ESP32-E22 x2"
+        radio_sub = "Wi-Fi 6E Tri-Band" if not v.is_dual else "Aggregated 6E"
+    else:
+        radio_label = "ESP32-C5 (U1)" if not v.is_dual else "ESP32-C5 x2"
+        radio_sub = "BLE + Wi-Fi 5GHz" if not v.is_dual else "BLE + 2x Wi-Fi"
+
+    dual_note = "" if not v.is_dual else '<text x="430" y="200" text-anchor="middle" font-size="10" fill="#b5654f" font-style="italic">+ U1B, AGG link</text>'
+
     return f'''<svg viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
   <defs>
     <filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#7a5a48" flood-opacity="0.16"/></filter>
@@ -638,7 +662,7 @@ def emit_block_svg(v: Variant) -> str:
   </defs>
   <rect width="900" height="540" fill="#fbf7f1"/>
   <text x="40" y="44" font-size="22" font-weight="bold" fill="#3a2c23">Tucklet — {v.name}</text>
-  <text x="40" y="66" font-size="12.5" fill="#8a7464">{RADIOS[v.radio]['label']} · {STORAGE[v.storage]['label']} · green=power, charcoal=data</text>
+  <text x="40" y="66" font-size="12.5" fill="#8a7464">{RADIOS[v.radio]['label']} · {STORAGE[v.storage]['label']} · {FORM_FACTORS[v.form_factor]['label']}</text>
 
   <g filter="url(#s)"><rect x="40" y="108" width="130" height="60" rx="12" fill="#fff"/></g>
   <text x="105" y="134" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">USB-C (J1)</text>
@@ -728,6 +752,10 @@ def validate(root: str) -> None:
     for v in ALL_VARIANTS:
         vdir = os.path.join(root, "variants", v.name)
         net = os.path.join(vdir, f"tucklet-{v.name}.net")
+        if not os.path.exists(net):
+            problems.append(f"{v.name}: netlist missing")
+            continue
+
         txt = open(net).read()
         # balanced parens
         if txt.count("(") != txt.count(")"):
@@ -748,6 +776,7 @@ def validate(root: str) -> None:
         dev = "J2" if v.storage == "microsd" else "XU7"
         if f'(ref "{dev}")' not in txt:
             problems.append(f"{v.name}: missing storage device {dev}")
+
     if problems:
         print("VALIDATION FAILED:")
         for p in problems:
