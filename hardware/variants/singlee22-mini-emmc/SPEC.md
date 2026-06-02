@@ -1,0 +1,47 @@
+# Variant Spec — singlee22-mini-emmc
+
+**Single ESP32-E22 (Wi-Fi 6E) + eMMC (sealed) (Mini (Compact))**
+
+## What this board is
+A Tucklet build with the single esp32-e22 (wi-fi 6e) radio and
+emmc (sealed) storage in a Mini (Compact) form factor.
+
+## Radio — ESP32-E22 (Wi-Fi 6E)
+Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
+**High Performance:** ~150 MB/s theoretical wireless throughput.
+**Power:** Requires larger battery and robust 3.3V regulation (U5).
+**Thermal:** High sustained throughput generates heat; monitor enclosure temps.
+
+## Storage — eMMC (sealed, per-SKU capacity)
+153-ball TFBGA eMMC 5.1, 11.5 x 13.0 x 1.2 mm. Capacity is fixed at manufacture.
+
+| Capacity | eMMC est. cost | Notes |
+|---|---|---|
+| 8 GB | ~$2.50 | sealed |
+| 16 GB | ~$3.50 | sealed |
+| 32 GB | ~$5.00 | sealed |
+| 64 GB | ~$8.00 | sealed |
+| 128 GB | ~$13.00 | sealed |
+| 256 GB | ~$22.00 | sealed |
+
+
+## Performance
+- Everyday wireless: **~150 MB/s**.
+- Bulk wired (USB-HS bridge): **~20-40 MB/s**.
+
+## Dimensions
+Enclosure envelope: **32 x 24 x 8 mm** (AirTag-class).
+
+## Files in this directory
+- `BOM.csv` — Full bill of materials.
+- `PIN_MAP.md` — Signal -> MCU pin mapping.
+- `SCHEMATIC_PLAN.md` — Net-by-net connection plan.
+- `tucklet-singlee22-mini-emmc.net` — KiCad logical netlist.
+- `block_diagram.svg` — System diagram.
+
+## Bring-up checklist
+- [ ] Reconcile signal->GPIO from the datasheet (PIN_MAP).
+- [ ] Confirm USB-HS bridge part number + handoff mode.
+- [ ] Validate SDIO timing.
+- [ ] Measure real TX current; size BT1 cell.
+- [ ] FCC/CE certification required (radios present).

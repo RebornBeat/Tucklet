@@ -1,0 +1,57 @@
+<svg viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <defs>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#7a5a48" flood-opacity="0.16"/></filter>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7a5a48"/></marker>
+  </defs>
+  <rect width="900" height="540" fill="#fbf7f1"/>
+  <text x="40" y="44" font-size="22" font-weight="bold" fill="#3a2c23">Tucklet — duale22-mini-microsd</text>
+  <text x="40" y="66" font-size="12.5" fill="#8a7464">Dual ESP32-E22 (High-Performance) · microSD (swappable) · Mini (Compact)</text>
+
+  <g filter="url(#s)"><rect x="40" y="108" width="130" height="60" rx="12" fill="#fff"/></g>
+  <text x="105" y="134" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">USB-C (J1)</text>
+  <text x="105" y="153" text-anchor="middle" font-size="10.5" fill="#6f5b4c">charge + data</text>
+  <g filter="url(#s)"><rect x="40" y="204" width="130" height="56" rx="12" fill="#fff"/></g>
+  <text x="105" y="228" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">Charger U3</text>
+  <text x="105" y="246" text-anchor="middle" font-size="10.5" fill="#6f5b4c">MCP73831</text>
+  <g filter="url(#s)"><rect x="40" y="296" width="130" height="56" rx="12" fill="#fff"/></g>
+  <text x="105" y="320" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">LiPo BT1</text>
+  <text x="105" y="338" text-anchor="middle" font-size="10.5" fill="#6f5b4c">+ gauge U4</text>
+  <g filter="url(#s)"><rect x="40" y="388" width="130" height="52" rx="12" fill="#fff"/></g>
+  <text x="105" y="411" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">Buck U5 3V3</text>
+
+  <g filter="url(#s)"><rect x="330" y="108" width="200" height="100" rx="14" fill="#fff"/></g>
+  <text x="430" y="138" text-anchor="middle" font-size="14" font-weight="bold" fill="#3a2c23">ESP32-E22 x2</text>
+  <text x="430" y="160" text-anchor="middle" font-size="11" fill="#6f5b4c">Aggregated 6E</text>
+  <text x="430" y="178" text-anchor="middle" font-size="11" fill="#6f5b4c">SDIO · I2C · GPIO</text>
+  <text x="430" y="200" text-anchor="middle" font-size="10" fill="#b5654f" font-style="italic">+ U1B, AGG link</text>
+
+  <g filter="url(#s)"><rect x="360" y="262" width="140" height="58" rx="12" fill="#fff"/></g>
+  <text x="430" y="286" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#3a2c23">SD mux U6</text>
+  <text x="430" y="304" text-anchor="middle" font-size="10.5" fill="#6f5b4c">radio &lt;-&gt; bridge</text>
+
+  <g filter="url(#s)"><rect x="330" y="372" width="200" height="72" rx="12" fill="#fff"/></g>
+  <text x="430" y="400" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">microSD (J2)</text>
+  <text x="430" y="420" text-anchor="middle" font-size="10.5" fill="#6f5b4c">SDIO 4-bit</text>
+
+  <g filter="url(#s)"><rect x="690" y="262" width="170" height="58" rx="12" fill="#fff"/></g>
+  <text x="775" y="286" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#3a2c23">USB-HS bridge U2</text>
+  <text x="775" y="304" text-anchor="middle" font-size="10.5" fill="#6f5b4c">~20-40 MB/s wired</text>
+
+  <g filter="url(#s)"><rect x="690" y="108" width="170" height="100" rx="14" fill="#fff"/></g>
+  <text x="775" y="138" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">UI</text>
+  <text x="775" y="162" text-anchor="middle" font-size="11" fill="#6f5b4c">Button SW1</text>
+  <text x="775" y="180" text-anchor="middle" font-size="11" fill="#6f5b4c">RGB LED1</text>
+
+  <g stroke="#7d9b86" stroke-width="2.5" fill="none" marker-end="url(#a)">
+    <path d="M105,168 L105,204"/><path d="M105,260 L105,296"/><path d="M105,352 L105,388"/>
+    <path d="M170,414 C 250,414 250,170 328,165"/>
+    <path d="M170,416 C 300,470 560,470 688,300"/>
+  </g>
+  <g stroke="#7a5a48" stroke-width="2" fill="none" marker-end="url(#a)">
+    <path d="M430,208 L430,260"/><path d="M430,320 L430,372"/>
+    <path d="M500,292 L688,292"/>
+    <path d="M170,138 C 250,120 600,120 688,150"/>
+    <path d="M530,150 C 600,150 640,150 688,150"/>
+  </g>
+  <text x="40" y="500" font-size="11" fill="#8a7464" font-style="italic">Wired: USB-C -&gt; bridge -&gt; storage (bypasses radio). Wireless: phone &lt;-&gt; radio &lt;-&gt; storage. Never both at once.</text>
+</svg>
