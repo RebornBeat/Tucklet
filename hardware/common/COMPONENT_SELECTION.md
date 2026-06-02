@@ -8,20 +8,27 @@ explains *why* each part is chosen.
 > Costs are order-of-magnitude at a few-hundred-unit volume. Verify live
 > availability on LCSC / Digi-Key / Mouser before committing.
 
-## 1. SoC / radio — ESP32-C5-WROOM-1  (`U1`, and `U1B` on dual)
-- Dual-band **Wi-Fi 6 (2.4 + 5 GHz)** + **BLE** on one module. The 5 GHz band is
-  less congested and roughly doubles the older ESP32-S3's wireless throughput —
-  ~9 MB/s at the close range a phone-mounted charm enjoys.
-- BLE is the always-on control/auth plane; Wi-Fi is the on-demand data plane.
-- Using the **pre-certified module** (not a bare chip) avoids bare-die RF layout
-  and substantially reduces the FCC/CE burden.
-- SDIO for fast storage access; mature-enough esp-idf support.
-- **Why C5 over S3:** the S3 is 2.4 GHz-only (~2–5 MB/s). For a product whose
-  whole pitch is "fast enough to be invisible," the 5 GHz band matters. (If
-  Wi-Fi Aware/NAN on the C5 proves unsupported during bring-up, the original
-  ESP32 has confirmed NAN; SoftAP works on the C5 regardless. See
-  `../../docs/FINAL_REVIEW.md`.)
-- ~$2.60/module.
+## 1. SoC / radio — ESP32-C5 & ESP32-E22 Families (`U1`, and `U1B` on dual)
+
+We offer two distinct product tiers via the radio selection, each available in Standard (WROOM) and Compact (Mini) form factors.
+
+### Tier 1: ESP32-C5 (The "Charm" Baseline)
+- **Performance:** Dual-band **Wi-Fi 6 (2.4 + 5 GHz)** + **BLE**. The 5 GHz band is less congested and roughly doubles the older ESP32-S3's wireless throughput — ~9 MB/s at the close range a phone-mounted charm enjoys.
+- **Form Factors:**
+    - **WROOM-1:** Standard footprint ($18.0 \times 25.5$ mm). Larger PCB antenna area for optimal range.
+    - **MINI-1:** Ultra-compact ($15.4 \times 21.3$ mm). Same silicon performance, optimized for tightest enclosure fit.
+- **Rationale:** BLE is the always-on control/auth plane; Wi-Fi is the on-demand data plane. Using the **pre-certified module** (not a bare chip) avoids bare-die RF layout and substantially reduces the FCC/CE burden.
+- **Why C5 over S3:** the S3 is 2.4 GHz-only (~2–5 MB/s). For a product whose whole pitch is "fast enough to be invisible," the 5 GHz band matters.
+- **Cost:** ~$2.60 (WROOM) / ~$2.40 (MINI).
+
+### Tier 2: ESP32-E22 (The "High-Performance" Pro Line)
+- **Performance:** Tri-band **Wi-Fi 6E (2.4, 5, 6 GHz)** + **BLE 5.4**. Features a dual-core RISC-V processor @ 500 MHz. Theoretical throughput exceeds 150 MB/s (device I/O limited).
+- **Form Factors:**
+    - **WROOM-1:** Standard footprint.
+    - **MINI-1:** Ultra-compact footprint.
+- **Rationale:** Targets users with extreme data density or congested 6 GHz environments. This chip is typically a Radio Co-Processor (RCP) but is utilized here as the main application processor to leverage its massive wireless bandwidth.
+- **Constraints:** Significantly higher power draw (~2A peak) and heat generation compared to the C5. Requires the "Pro" power subsystem (Section 7/8).
+- **Cost:** ~$4.50 (WROOM) / ~$4.20 (MINI).
 
 ## 2. USB-HS storage bridge — generic USB2.0 High-Speed SD/eMMC bridge (`U2`)
 - The fast **wired** path (~20–40 MB/s). It owns the storage directly when the
@@ -44,24 +51,27 @@ explains *why* each part is chosen.
 
 ## 5. Battery charger — MCP73831 (`U3`)
 - Single-cell Li-ion/LiPo linear charger from VBUS; `PROG` resistor sets current
-  (size to the cell). `STAT` → a C5 GPIO so firmware knows charge state.
+  (size to the cell). `STAT` → a GPIO so firmware knows charge state.
 - ~$0.50.
 
 ## 6. Fuel gauge — MAX17048 (`U4`)
 - I²C model-gauge so the app shows a **real** battery percentage, not a guess.
-  `ALRT` → a C5 GPIO for a low-battery interrupt.
+  `ALRT` → a GPIO for a low-battery interrupt.
 - ~$0.80.
 
 ## 7. Regulator — 3.3 V buck (`U5`)
-- Sized for the **Wi-Fi TX peak (~500 mA bursts)**, not the average —
-  under-sizing causes mid-transfer brownout resets, the #1 ESP bring-up bug.
-- Dual-radio boards use a larger buck (≥1 A) for two simultaneous radios.
-- ~$0.40 (single) / ~$0.55 (dual).
+- Sized for the **Wi-Fi TX peak**, not the average — under-sizing causes mid-transfer brownout resets, the #1 ESP bring-up bug.
+- **Tier 1 (C5):**
+    - **Single Radio:** ~500 mA bursts. Standard 600 mA+ buck (~$0.40).
+    - **Dual Radio:** ~1 A peak. Larger buck (~$0.55).
+- **Tier 2 (E22):**
+    - **All E22 Variants:** Dual-core 500 MHz + Wi-Fi 6E draws ~2 A peak. Requires a high-current buck regulator (e.g., TPS62840-class) (~$1.20).
+- **Thermal Note:** On E22 boards, the regulator will dissipate noticeable heat. Ensure copper pour connection.
 
-## 8. Battery — LiPo ~120–200 mAh + protection (`BT1`)
-- Final mAh set **after measuring real 5 GHz transfer current** on a prototype.
-  Dual-radio needs a larger cell. Always with a protection circuit (PCM).
-- ~$2.00.
+## 8. Battery — LiPo (`BT1`)
+- Final mAh set **after measuring real transfer current** on a prototype.
+- **Tier 1 (C5):** 120–200 mAh + PCM. ~$2.00. Fits the "Charm" envelope.
+- **Tier 2 (E22):** 300–500 mAh + PCM. ~$3.50. Required to sustain high-throughput sessions. May dictate a slightly larger "Pro" enclosure or denser cell technology.
 
 ## 9. UI — button + RGB LED (`SW1`, `LED1`, `R6`)
 - One tactile button (pair / factory-reset via press patterns) with a 10 kΩ
@@ -74,11 +84,7 @@ explains *why* each part is chosen.
 - ~$0.80 grouped (expand `C_GRP` to individual C refs during layout).
 
 ## Shared electronics subtotal
-Roughly **$9.5–$10.5** before the storage device, PCB, and enclosure — see each
-`variants/<name>/BOM.csv` for the exact, authoritative totals. The
-`singlec5-microsd` baseline lands at **~$13.66 full BOM**, inside the sub-$15
-target; eMMC and dual-radio variants rise from there (flash and the second radio
-cost money — that's expected and is exactly why both lines exist).
+Roughly **$9.5–$10.5** (C5 baseline) to **$14.00+** (E22 baseline) before the storage device, PCB, and enclosure — see each `variants/<name>/BOM.csv` for the exact, authoritative totals. The `singlec5-microsd` baseline lands at **~$13.66 full BOM**, inside the sub-$15 target; E22 variants rise from there (performance costs money — expected for the "Pro" line).
 
 ## Not produced here (and why)
 - **Gerbers / pick-and-place:** outputs of PCB layout + DFM, not schematic
