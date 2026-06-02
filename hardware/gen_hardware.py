@@ -26,6 +26,9 @@ The MCU module's GPIO assignments are expressed as SIGNAL NAMES,
 because the exact module pin numbers must be read from the current datasheet.
 The netlist is a "logical" netlist in the KiCad sense.
 
+Charm Strategy Note: This generator enforces the "Charm" form factor.
+Oversized variants (e.g., E22-WROOM) are excluded to maintain product identity.
+
 License: CC BY-NC-SA 4.0 (hardware design files).
 """
 
@@ -108,8 +111,10 @@ class Variant:
         return self.chip == "e22"
 
 
-# Generate ALL variants: 4 Radio configs x 2 Storage x 2 Form Factors = 16 Variants
-ALL_VARIANTS = [Variant(r, s, f) for r in RADIOS for s in STORAGE for f in FORM_FACTORS]
+# Generate ONLY "Charm" variants.
+# Filter logic: Exclude E22-WROOM variants (oversized M.2 form factor) to enforce product identity.
+raw_variants = [Variant(r, s, f) for r in RADIOS for s in STORAGE for f in FORM_FACTORS]
+ALL_VARIANTS = [v for v in raw_variants if not (v.is_e22 and v.form_factor == "wroom")]
 
 
 # ---------------------------------------------------------------------------
@@ -136,21 +141,33 @@ def build_components(v: Variant) -> list[Comp]:
     c: list[Comp] = []
 
     # --- U1 radio/MCU (signal-named pins) ---
-    # Logic to select specific MCU part
+    # Exact Naming Strategy:
+    # C5-WROOM -> ESP32-C5-WROOM-1
+    # C5-MINI  -> ESP32-C5-MINI-1
+    # E22-MINI -> ESP32-E22-MINI-1 (Projected/Roadmap)
+
     if v.chip == "e22":
-        base_val = "ESP32-E22"
-        base_mpn = "ESP32-E22-WROOM-1" if v.form_factor == "wroom" else "ESP32-E22-MINI-1"
-        # E22 Footprints (Hypothetical standard names - User must verify/create)
-        base_fp = "RF_Module:Espressif_ESP32-E22_WROOM-1" if v.form_factor == "wroom" else "RF_Module:Espressif_ESP32-E22_MINI-1"
-        mcu_desc = "Wi-Fi 6E + BLE 5.4 Radio Co-Processor (MCU mode)"
-        mcu_cost = 4.50 if v.form_factor == "wroom" else 4.20
+        # E22 Strategy: Mini ONLY for Charm form factor.
+        base_val = "ESP32-E22-MINI-1"
+        base_mpn = "ESP32-E22-MINI-1"
+        # Footprint placeholder - User must create/update in KiCad
+        base_fp = "RF_Module:Espressif_ESP32-E22_MINI-1"
+        mcu_desc = "Wi-Fi 6E + BLE 5.4 Radio Co-Processor (Projected/Future)"
+        mcu_cost = 4.20 # Estimate based on Mini class
+        mcu_note = "Projected component; roadmap item pending official release."
     else: # C5
-        base_val = "ESP32-C5-WROOM-1" if v.form_factor == "wroom" else "ESP32-C5-MINI-1"
-        base_mpn = f"{base_val}-N8"
-        # Using S3 footprint as proxy for C5 (standard hacking practice until libs update)
-        base_fp = "RF_Module:ESP32-S3-WROOM-1" if v.form_factor == "wroom" else "RF_Module:ESP32-S3-WROOM-1" # Mini footprint mapping TBD
+        if v.form_factor == "wroom":
+            base_val = "ESP32-C5-WROOM-1"
+            base_mpn = "ESP32-C5-WROOM-1-N8"
+            base_fp = "RF_Module:ESP32-S3-WROOM-1" # Proxy footprint
+        else: # mini
+            base_val = "ESP32-C5-MINI-1"
+            base_mpn = "ESP32-C5-MINI-1"
+            base_fp = "RF_Module:ESP32-S3-WROOM-1" # Placeholder proxy
+
         mcu_desc = "Wi-Fi 6 dual-band + BLE module (radio/MCU)"
         mcu_cost = 2.60 if v.form_factor == "wroom" else 2.40
+        mcu_note = ""
 
     radio_pins = [
         ("GND", "GND", "power_in"),
@@ -179,7 +196,7 @@ def build_components(v: Variant) -> list[Comp]:
         radio_pins += [("AGG_TX", "AGG_A", "output"), ("AGG_RX", "AGG_B", "input")]
 
     c.append(Comp("U1", base_val, base_fp, mcu_desc,
-                  pins=radio_pins, unit_cost=mcu_cost, mpn=base_mpn))
+                  pins=radio_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
 
     if v.is_dual:
         radio2_pins = [
@@ -191,7 +208,7 @@ def build_components(v: Variant) -> list[Comp]:
         ]
         c.append(Comp("U1B", base_val, base_fp,
                       "Second radio for link aggregation",
-                      pins=radio2_pins, unit_cost=mcu_cost, mpn=base_mpn))
+                      pins=radio2_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
 
     # --- U2 USB-HS storage bridge (real-ish pinout, generic) ---
     c.append(Comp("U2", "USB2.0-HS SD/eMMC bridge", "Package_DFN_QFN:QFN-24",
@@ -596,6 +613,7 @@ Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
 **High Performance:** ~{v.wireless_mb_s} MB/s theoretical wireless throughput.
 **Power:** Requires larger battery and robust 3.3V regulation (U5).
 **Thermal:** High sustained throughput generates heat; monitor enclosure temps.
+**Status:** Roadmap item. Utilizes projected `ESP32-E22-MINI-1` module.
 """
     else:
         chip_block = f"""

@@ -1,5 +1,5 @@
 ref,qty,value,mpn,footprint,unit_cost_usd,line_cost_usd,description,note
-U1,1,ESP32-E22,ESP32-E22-MINI-1,RF_Module:Espressif_ESP32-E22_MINI-1,4.20,4.20,Wi-Fi 6E + BLE 5.4 Radio Co-Processor (MCU mode),
+U1,1,ESP32-E22-MINI-1,ESP32-E22-MINI-1,RF_Module:Espressif_ESP32-E22_MINI-1,4.20,4.20,Wi-Fi 6E + BLE 5.4 Radio Co-Processor (Projected/Future),Projected component; roadmap item pending official release.
 U2,1,USB2.0-HS SD/eMMC bridge,GL3224-OEM (or RTS5306-class),Package_DFN_QFN:QFN-24,1.60,1.60,USB High-Speed mass-storage bridge; owns storage when plugged in,
 U3,1,MCP73831,MCP73831T-2ACI/OT,Package_TO_SOT_SMD:SOT-23-5,0.50,0.50,Single-cell Li-ion/LiPo charge management,
 U4,1,MAX17048,MAX17048G+T10,Package_DFN_QFN:TDFN-8-1EP_3x3mm,0.80,0.80,I2C fuel gauge (real battery percent),

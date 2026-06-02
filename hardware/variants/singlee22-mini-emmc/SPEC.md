@@ -11,6 +11,7 @@ Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
 **High Performance:** ~150 MB/s theoretical wireless throughput.
 **Power:** Requires larger battery and robust 3.3V regulation (U5).
 **Thermal:** High sustained throughput generates heat; monitor enclosure temps.
+**Status:** Roadmap item. Utilizes projected `ESP32-E22-MINI-1` module.
 
 ## Storage — eMMC (sealed, per-SKU capacity)
 153-ball TFBGA eMMC 5.1, 11.5 x 13.0 x 1.2 mm. Capacity is fixed at manufacture.
