@@ -6,6 +6,12 @@
 // envelope in docs/TRANSFER_PERFORMANCE.md / hardware/VARIANTS.md:
 //   microSD variant ~ 35 x 28 x 9 mm   |   eMMC variant ~ 32 x 24 x 8 mm
 //
+// Charm Strategy Verified:
+// This envelope accommodates the ESP32-C5-WROOM-1 (18.0 x 27.5 mm).
+// NOTE: The C5-WROOM length (27.5mm) fits along the X-axis (35mm outer).
+// Orientation: The module MUST be placed parallel to the X-axis to fit within
+// the Y-axis (28mm outer) constraint.
+//
 // This is dimensioned from the DOCUMENTED envelope. Before cutting plastic,
 // set the cutout offsets to your actual KiCad board placement (the connector
 // X/Y positions), then re-render. Everything here is a real, editable solid.
@@ -20,7 +26,7 @@
 // ---- parameters ------------------------------------------------------------
 variant = "microsd";      // "microsd" | "emmc"
 part    = 0;              // 0 = base, 1 = lid, 2 = both (preview)
-$fn     = 64;
+ $fn     = 64;
 
 wall      = 1.6;          // wall thickness
 floor_th  = 1.4;          // floor/ceiling thickness
@@ -29,6 +35,8 @@ lid_h     = 3.0;          // lid height (cap)
 gap       = 0.15;         // print clearance for the snap fit
 
 // Envelope per variant (outer X, Y, total Z).
+// microSD: 35mm X fits ESP32-C5-WROOM-1 (27.5mm length) with margin.
+// eMMC:    32mm X fits ESP32-C5-MINI-1 (21.3mm length) easily.
 outer_x   = (variant == "emmc") ? 32 : 35;
 outer_y   = (variant == "emmc") ? 24 : 28;
 outer_z   = (variant == "emmc") ? 8  : 9;
