@@ -24,7 +24,7 @@ storage in their life.
 | | |
 |---|---|
 | **Storage** | **microSD** (swappable) or **eMMC** (sealed) — your choice of variant. |
-| **Radio** | **ESP32-C5** (dual-band Wi-Fi 6 + BLE), single or dual. |
+| **Radio** | **ESP32-C5** (Wi-Fi 6 + BLE) in Standard or Mini form factors; **ESP32-E22** (Wi-Fi 6E) roadmap. |
 | **Control link** | **BLE** — discovery, auth, battery %, wake. Low power, always cheap. |
 | **Wireless data** | **Wi-Fi** (SoftAP universally; **Wi-Fi Aware** seamlessly where certified). On only while transferring. |
 | **Wired data** | **USB-C → USB-HS bridge** — ~20–40 MB/s for bulk; also charges. |
@@ -62,7 +62,21 @@ tucklet/
 │   ├── gen_hardware.py        # parametric SOURCE — regenerates every variant
 │   ├── common/                # shared parts rationale, cross-variant comparison, block diagram
 │   └── variants/              # one folder per board: SPEC, BOM, PIN_MAP, SCHEMATIC_PLAN, .net, diagram
-│       ├── singlec5-microsd/  ├── singlec5-emmc/  ├── dualc5-microsd/  └── dualc5-emmc/
+│       # C5 Standard (WROOM)
+│       ├── singlec5-wroom-microsd/
+│       ├── singlec5-wroom-emmc/
+│       ├── dualc5-wroom-microsd/
+│       ├── dualc5-wroom-emmc/
+│       # C5 Mini (Compact)
+│       ├── singlec5-mini-microsd/
+│       ├── singlec5-mini-emmc/
+│       ├── dualc5-mini-microsd/
+│       ├── dualc5-mini-emmc/
+│       # E22 Mini (Roadmap/Future)
+│       ├── singlee22-mini-microsd/
+│       ├── singlee22-mini-emmc/
+│       ├── duale22-mini-microsd/
+│       └── duale22-mini-emmc/
 ├── firmware/                  # Rust workspace (tucklet-proto + tucklet-core compile + tested)
 ├── software/ios/              # iOS companion app (SwiftUI + File Provider)
 ├── software/android/          # Android app (Kotlin + Jetpack Compose)
@@ -74,7 +88,7 @@ tucklet/
 
 1. [`docs/INDEX.md`](docs/INDEX.md) — the full documentation map.
 2. [`docs/FINAL_REVIEW.md`](docs/FINAL_REVIEW.md) — the load-bearing decisions, current.
-3. [`hardware/README.md`](hardware/README.md) — the four board variants and how to build them in KiCad.
+3. [`hardware/README.md`](hardware/README.md) — the board variants and how to build them in KiCad.
 4. [`docs/protocol/PROTOCOL.md`](docs/protocol/PROTOCOL.md) — the contract that keeps firmware and apps in sync.
 
 ## Build status
@@ -84,7 +98,7 @@ What is **compiled and tested** here (run `cargo test` in `firmware/`):
 - `firmware/crates/tucklet-proto` — every wire type (variant matrix, states, origin metadata, transfers). *5 tests._
 - `firmware/crates/tucklet-core` — device brain: estimator, link profiles, state machine, trickle scheduler, **session credentials**, Temporary expiry, allow-list, transport resolution. *16 tests._
 
-What is **complete and verified to render**: the parametric hardware (4 variants, all netlists validated), the enclosure (renders watertight STLs for both envelopes), and all design docs.
+What is **complete and verified to render**: the parametric hardware (**12 Charm-optimized variants**, all netlists validated), the enclosure (renders watertight STLs for both envelopes), and all design docs.
 
 What **builds on this foundation and needs on-hardware/SDK bring-up**: the
 on-device ESP32-C5 firmware binary and the native apps (iOS present; Android +

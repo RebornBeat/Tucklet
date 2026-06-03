@@ -15,8 +15,8 @@ We offer two distinct product tiers via the radio selection, each available in S
 ### Tier 1: ESP32-C5 (The "Charm" Baseline)
 - **Performance:** Dual-band **Wi-Fi 6 (2.4 + 5 GHz)** + **BLE**. The 5 GHz band is less congested and roughly doubles the older ESP32-S3's wireless throughput — ~9 MB/s at the close range a phone-mounted charm enjoys.
 - **Form Factors:**
-    - **WROOM-1:** Standard footprint ($18.0 \times 25.5$ mm). Larger PCB antenna area for optimal range.
-    - **MINI-1:** Ultra-compact ($15.4 \times 21.3$ mm). Same silicon performance, optimized for tightest enclosure fit.
+    - **ESP32-C5-WROOM-1:** Standard footprint (**18.0 x 27.5 mm**). Larger PCB antenna area for optimal range.
+    - **ESP32-C5-MINI-1:** Ultra-compact (**15.4 x 21.3 mm**). Same silicon performance, optimized for tightest enclosure fit.
 - **Rationale:** BLE is the always-on control/auth plane; Wi-Fi is the on-demand data plane. Using the **pre-certified module** (not a bare chip) avoids bare-die RF layout and substantially reduces the FCC/CE burden.
 - **Why C5 over S3:** the S3 is 2.4 GHz-only (~2–5 MB/s). For a product whose whole pitch is "fast enough to be invisible," the 5 GHz band matters.
 - **Cost:** ~$2.60 (WROOM) / ~$2.40 (MINI).
@@ -24,11 +24,11 @@ We offer two distinct product tiers via the radio selection, each available in S
 ### Tier 2: ESP32-E22 (The "High-Performance" Pro Line)
 - **Performance:** Tri-band **Wi-Fi 6E (2.4, 5, 6 GHz)** + **BLE 5.4**. Features a dual-core RISC-V processor @ 500 MHz. Theoretical throughput exceeds 150 MB/s (device I/O limited).
 - **Form Factors:**
-    - **WROOM-1:** Standard footprint.
-    - **MINI-1:** Ultra-compact footprint.
+    - **ESP32-E22-MINI-1 (Projected):** Ultra-compact footprint. **Primary target for the "Pro Charm" line.** Fits the Charm form factor with integrated PCB antenna.
+    - **ESP32-E22-WROOM / M.2:** **Excluded.** Standard/M.2 modules require external IPEX antennas (reliability risk in a sealed charm) and larger board area, violating the "Charm" product identity.
 - **Rationale:** Targets users with extreme data density or congested 6 GHz environments. This chip is typically a Radio Co-Processor (RCP) but is utilized here as the main application processor to leverage its massive wireless bandwidth.
 - **Constraints:** Significantly higher power draw (~2A peak) and heat generation compared to the C5. Requires the "Pro" power subsystem (Section 7/8).
-- **Cost:** ~$4.50 (WROOM) / ~$4.20 (MINI).
+- **Cost:** ~$4.20 (MINI, estimated).
 
 ## 2. USB-HS storage bridge — generic USB2.0 High-Speed SD/eMMC bridge (`U2`)
 - The fast **wired** path (~20–40 MB/s). It owns the storage directly when the
