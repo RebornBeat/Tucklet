@@ -36,16 +36,32 @@ the top.
   open-source" distinction.
 
 ## Hardware — build in KiCad from these
-- `../hardware/README.md` — overview, the four variants, how to import the
+- `../hardware/README.md` — overview, the variants, how to import the
   netlist or build by hand, how to regenerate.
 - `../hardware/gen_hardware.py` — the parametric source (regenerates all variants).
-- `../hardware/common/COMPONENT_SELECTION.md` — shared parts + rationale (C5 era).
+- `../hardware/common/COMPONENT_SELECTION.md` — shared parts + rationale (C5 era + E22 roadmap).
 - `../hardware/common/VARIANTS.md` — cross-variant comparison, capacities, dimensions.
 - `../hardware/common/block_diagram.svg` — system block diagram.
 - `../hardware/variants/<variant>/` — per board: `SPEC.md`, `BOM.csv`,
   `PIN_MAP.md`, `SCHEMATIC_PLAN.md`, `tucklet-<variant>.net` (KiCad netlist),
-  `block_diagram.svg`. Variants: `singlec5-microsd`, `singlec5-emmc`,
-  `dualc5-microsd`, `dualc5-emmc`.
+  `block_diagram.svg`.
+
+  **Variants (Generated):**
+  *Production (C5):*
+  - `singlec5-wroom-microsd`
+  - `singlec5-wroom-emmc`
+  - `singlec5-mini-microsd`
+  - `singlec5-mini-emmc`
+  - `dualc5-wroom-microsd`
+  - `dualc5-wroom-emmc`
+  - `dualc5-mini-microsd`
+  - `dualc5-mini-emmc`
+
+  *Roadmap (E22-MINI Projected):*
+  - `singlee22-mini-microsd`
+  - `singlee22-mini-emmc`
+  - `duale22-mini-microsd`
+  - `duale22-mini-emmc`
 
 ## Mechanical
 - `../mechanical/enclosure.scad` — parametric enclosure; renders watertight STLs

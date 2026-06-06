@@ -1,31 +1,58 @@
 # Variant Matrix — every build configuration, and how one codebase serves all
 
-Tucklet is not one device; it's a small product line from a single shared codebase. Three independent axes multiply into the full matrix. Firmware and apps adapt at runtime via the `DeviceCapabilities` descriptor (see `tucklet-proto`), so there is **one** firmware source and **one** app per platform — variants are configuration + capability negotiation, not forks.
+Tucklet is not one device; it's a small product line from a single shared codebase. Four independent axes multiply into the full matrix. Firmware and apps adapt at runtime via the `DeviceCapabilities` descriptor (see `tucklet-proto`), so there is **one** firmware source and **one** app per platform — variants are configuration + capability negotiation, not forks.
 
-## The three axes
+## The four axes
 
 | Axis | Options | Chosen by |
 |---|---|---|
-| Radio | `SingleC5` / `DualC5` | hardware build (compile-time feature) |
-| Storage | `MicroSd` / `Emmc{capacity_gib}` | hardware build |
-| Transport(s) | `SoftAp` (always) + optionally `WifiAware` + optionally `WiredUsbHs` | firmware feature flags + runtime |
+| **Chip** | `C5` (Production) / `E22` (Roadmap) | hardware build (compile-time feature) |
+| **Form Factor** | `WROOM` (Standard) / `MINI` (Compact) | hardware build |
+| **Radio Count** | `Single` / `Dual` | hardware build |
+| **Storage** | `MicroSd` / `Emmc{capacity_gib}` | hardware build |
+| **Transport(s)** | `SoftAp` (always) + optionally `WifiAware` + optionally `WiredUsbHs` | firmware feature flags + runtime |
 
-2 radios x 2 storage families x transport sets = the full matrix below.
+Theoretical maximum: 2 Chips x 2 Forms x 2 Counts x 2 Storage = 16 Variants.
+**Actual Generated Variants:** 12 (See "Charm Strategy Exclusion" below).
 
-## The 8 headline configurations
+## Charm Strategy Exclusion
+To maintain the "Charm" product identity (invisible, robust, AirTag-class), we enforce a strict size constraint.
+*   **Excluded:** `E22-WROOM` variants. The WROOM/M.2 module is oversized (22x30mm) and requires an external antenna (IPEX), which violates the sealed/integrated design philosophy.
+*   **Included:** `E22-MINI` variants. We anticipate a future Mini module that fits the Charm form factor. These are marked as **Roadmap** items.
 
-| # | Radio | Storage | Wireless transport | Wired | Position |
+## The 12 generated configurations
+
+### Tier 1: The "Charm" (Standard C5)
+The production-ready baseline using the ESP32-C5-WROOM-1 module.
+
+| # | Radio | Storage | Wireless | Wired | Position |
 |---|---|---|---|---|---|
-| 1 | SingleC5 | microSD | SoftAp | USB-HS | **v1 baseline** — cheapest, universal, swappable |
-| 2 | SingleC5 | microSD | SoftAp + WiFiAware | USB-HS | v1 + seamless iOS/Android |
-| 3 | SingleC5 | eMMC | SoftAp | USB-HS | sealed/slim, fixed capacity |
-| 4 | SingleC5 | eMMC | SoftAp + WiFiAware | USB-HS | sealed + seamless (premium) |
-| 5 | DualC5 | microSD | SoftAp | USB-HS | speed-focused, swappable |
-| 6 | DualC5 | microSD | SoftAp + WiFiAware | USB-HS | speed + seamless |
-| 7 | DualC5 | eMMC | SoftAp | USB-HS | speed + sealed |
-| 8 | DualC5 | eMMC | SoftAp + WiFiAware | USB-HS | top of line |
+| 1 | SingleC5 | microSD | SoftAp | USB-HS | **Baseline** — cheapest, swappable |
+| 2 | SingleC5 | eMMC | SoftAp | USB-HS | Slim, sealed, fixed capacity |
+| 3 | DualC5 | microSD | SoftAp | USB-HS | Speed-focused, swappable |
+| 4 | DualC5 | eMMC | SoftAp | USB-HS | Speed + sealed |
 
-(microSD and eMMC each span the capacity sub-axis; eMMC capacities and BOM are in `hardware/common/VARIANTS.md`.)
+### Tier 2: The "Nano" (Mini C5)
+The ultra-compact production line using the ESP32-C5-MINI-1 module.
+
+| # | Radio | Storage | Wireless | Wired | Position |
+|---|---|---|---|---|---|
+| 5 | SingleC5 | microSD | SoftAp | USB-HS | Ultra-compact, swappable |
+| 6 | SingleC5 | eMMC | SoftAp | USB-HS | Smallest sealed charm |
+| 7 | DualC5 | microSD | SoftAp | USB-HS | Experimental speed in Nano form |
+| 8 | DualC5 | eMMC | SoftAp | USB-HS | Top-tier Nano |
+
+### Tier 3: The "Super-Charm" (Roadmap E22)
+High-performance variants dependent on the future release of an ESP32-E22-MINI-1 module.
+
+| # | Radio | Storage | Wireless | Wired | Position |
+|---|---|---|---|---|---|
+| 9 | SingleE22 | microSD | SoftAp | USB-HS | High-speed roadmap |
+| 10 | SingleE22 | eMMC | SoftAp | USB-HS | High-speed sealed roadmap |
+| 11 | DualE22 | microSD | SoftAp | USB-HS | Extreme performance roadmap |
+| 12 | DualE22 | eMMC | SoftAp | USB-HS | Ultimate speed roadmap |
+
+*(Note: microSD and eMMC each span the capacity sub-axis; eMMC capacities and BOM are in `hardware/common/VARIANTS.md`.)*
 
 ## How firmware handles the matrix
 
@@ -33,13 +60,26 @@ Compile-time Cargo features select the hardware reality; everything else is runt
 
 ```
 [features]
-radio_single_c5 = []     # exactly one radio_* feature
-radio_dual_c5   = []
-storage_microsd = []     # exactly one storage_* feature
+# Chip selection
+chip_c5 = []
+chip_e22 = []
+
+# Form Factor
+form_wroom = []
+form_mini  = []
+
+# Radio Count (derived or explicit)
+radio_single = []
+radio_dual   = []
+
+# Storage
+storage_microsd = []
 storage_emmc    = []
-transport_softap = []    # always on
-transport_wifi_aware = []# optional
-transport_wired_usbhs = []# optional (the bridge IC is populated)
+
+# Transport
+transport_softap = []        # always on
+transport_wifi_aware = []    # optional
+transport_wired_usbhs = []   # optional (the bridge IC is populated)
 ```
 
 At boot the firmware assembles a `DeviceCapabilities` from its enabled features and advertises it. `tucklet-core::variant::usable_transports()` (unit-tested) then narrows that to what the connected client can use.
@@ -52,7 +92,7 @@ The app never hard-codes a variant. On connect it reads `DeviceCapabilities` ove
 2. Loads the matching `LinkProfile` (`tucklet-core::link::profile_for`) so the transfer-time estimate reflects *this* unit's real speed.
 3. Renders capacity, storage type, and battery from the live `StatusReport`.
 
-So a user with a microSD SingleC5 and a user with a DualC5 eMMC run the identical app; it simply reports different speeds and capacities. The same is true across iOS, Android, and desktop because all three consume the same `tucklet-proto` types.
+So a user with a microSD SingleC5 Mini and a user with a DualC5 eMMC Standard run the identical app; it simply reports different speeds and capacities. The same is true across iOS, Android, and desktop because all three consume the same `tucklet-proto` types.
 
 ## Capability negotiation sequence
 

@@ -19,14 +19,14 @@ Wi-Fi Aware / NAN is the "between BLE and WiFi" technology: BLE-style discovery 
 
 ### Risks to settle EARLY (do not assume)
 1. **iOS requires a Wi-Fi Aware *certified* accessory.** Apple's `WiFiAware` framework (iOS 26) talks to certified accessories — not arbitrary NAN devices. Wi-Fi Alliance certification is a real cost/step before the clean iOS path works. SoftAP needs no certification.
-2. **ESP32-S3 NAN support is ambiguous.** Espressif docs list NAN APIs for the S3, but a 2024 Espressif tracker marked C3/S3 NAN "Won't Do," while the original **ESP32** and **ESP32-S2** clearly support NAN. If Wi-Fi Aware is must-have, either target the original ESP32 (confirmed NAN) or validate S3 NAN on current ESP-IDF before committing silicon. SoftAP works on the S3 regardless.
+2. **ESP32-C5 NAN support is new.** The ESP32-C5 is a newer chip. While Espressif lists Wi-Fi 6 features, NAN (Neighbor Awareness Networking) support must be validated on the current ESP-IDF for C5. If Wi-Fi Aware is must-have on day one, validate C5 NAN support early. SoftAP works on the C5 regardless.
 
 ## 2. iOS reality — can we do "everything"? (supersedes ADR-003)
 
 Much closer to yes than six months ago, but three hard limits remain. None are solvable by "more engineering effort" — they are deliberate OS boundaries.
 
 | Capability | iOS status |
-|---|---|
+|---|---|---|
 | One-time pairing, seamless | **Yes** — AccessorySetupKit (iOS 18) gives "bring close, tap to pair." Full AirPods-grade *proximity* parity is currently **EU-only** (DMA); the base flow is worldwide. |
 | High-speed transfer, no AP prompt | **Yes via Wi-Fi Aware** (certified). Otherwise SoftAP works everywhere with a one-time join prompt. |
 | Files appear like local files | **Yes** — File Provider extension (shows in Files app). |
@@ -64,13 +64,36 @@ The product must feel invisible: **one button press ever** (first-time pairing),
 - **Per-app organization** by default (Camera, Screenshots, WhatsApp…), with an optional friendly folder view for power users — never forced.
 - Real battery %, real free space, real transfer progress. No guessing, no mystery usage.
 
-## 5. SoC decision
-- **Default: ESP32-S3-WROOM-1** (WiFi + BLE, SDIO for storage, mature Rust/esp-idf, pre-certified module lowers FCC/CE burden). Use this if SoftAP is the data path.
-- **If Wi-Fi Aware is required on day one:** evaluate the original **ESP32** (confirmed NAN) instead, accepting its older feature set, OR validate S3 NAN on current ESP-IDF first. Settle this before ordering boards.
+## 5. SoC decision — The "Charm Strategy"
+
+The hardware strategy is now aligned exclusively around the **"Charm" form factor** (AirTag-class, < 35mm width). Oversized "Pro" or "Backpack" variants are excluded to preserve product identity.
+
+### Production Hardware (Default)
+**SoC:** **ESP32-C5** (RISC-V, Wi-Fi 6, BLE 5.0/5.4, Thread/Zigbee).
+*   **Form Factors:**
+    *   `ESP32-C5-WROOM-1` (Standard, 18 x 27.5mm).
+    *   `ESP32-C5-MINI-1` (Compact, 15.4 x 21.3mm).
+*   **Rationale:**
+    *   **Dual-Band Wi-Fi 6:** Supports 5 GHz. This is the critical feature that doubles real-world throughput (~9 MB/s) compared to older 2.4 GHz chips (S3/C3), fulfilling the "invisible transfer" promise.
+    *   **Form Factor:** The C5-MINI-1 enables the smallest possible "Charm" designs, fitting easily into the 32mm enclosure class.
+    *   **Integration:** Integrated PCB antenna (WROOM/MINI) eliminates the reliability risks and assembly complexity of external IPEX cables/ceramic antennas found in M.2 modules.
+    *   **Power:** Highly efficient, suitable for 120-200mAh batteries.
+*   **Status:** **Production Ready.**
+
+### Roadmap Hardware (Future/Projected)
+**SoC:** **ESP32-E22** (Wi-Fi 6E, Tri-band, High Performance).
+*   **Form Factor:** `ESP32-E22-MINI-1` (Projected/Planned).
+*   **Rationale:** The E22 brings Wi-Fi 6E (6 GHz band) and extreme throughput (150+ Mbps theoretical), but requires significantly more power and heat management.
+*   **Strategy:** We hold the **Design IP** for an E22-MINI variant. This design will be released as the "Super-Charm" **only when** Espressif releases the `ESP32-E22-MINI-1` module (with integrated antenna). Current E22 M.2 modules are rejected due to size/antenna constraints.
+
+### Deprecated Hardware
+*   **ESP32-S3:** Replaced by ESP32-C5. The S3 lacks 5 GHz Wi-Fi, which is a hard requirement for the Tucklet performance targets. It also lacks the mature Thread/Zigbee integration of the C5.
+*   **ESP32-E22 M.2 (22x30mm):** Rejected. Requires external antenna and forces a "Puck/Backpack" form factor, which dilutes the "Charm" brand identity.
 
 ## 6. Open items before firmware
-- [ ] Confirm Wi-Fi Aware target: SoftAP-only v1, or NAN from the start? (drives SoC choice)
+- [x] ~~Confirm Wi-Fi Aware target: SoftAP-only v1, or NAN from the start?~~ -> **Decision:** SoftAP is the guaranteed Layer 1 path. NAN is a stretch goal for iOS seamless UX.
+- [x] ~~SoC Selection~~ -> **Decision:** ESP32-C5 (Production), ESP32-E22-MINI (Roadmap).
 - [ ] Decide final name (working: **Tucklet**).
 - [ ] Pick the launch capacities for the eMMC variant (see hardware/common/VARIANTS.md).
-- [ ] Measure real transfer-current on a dev board to size the battery.
+- [ ] Measure real transfer-current on a C5 dev board to size the battery (Peak TX current sizing).
 - [ ] Budget Wi-Fi Alliance certification (only if pursuing the iOS Wi-Fi Aware path) and FCC/CE (always, due to radios).
