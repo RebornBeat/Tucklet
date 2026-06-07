@@ -31,7 +31,7 @@ Dual-band Wi-Fi 6 (2.4 + 5 GHz) + BLE. ~9 MB/s wireless at close range.
 Enclosure envelope: **32 x 24 x 8 mm** (AirTag-class).
 
 ## Files in this directory
-- `BOM.csv` — Full bill of materials.
+- `SPEC.md` — Full bill of materials.
 - `PIN_MAP.md` — Signal -> MCU pin mapping.
 - `SCHEMATIC_PLAN.md` — Net-by-net connection plan.
 - `tucklet-singlec5-wroom-emmc.net` — KiCad logical netlist.

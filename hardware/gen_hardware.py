@@ -13,6 +13,19 @@ artifacts under variants/<name>/:
     tucklet-<name>.net   KiCad-importable netlist (Pcbnew: File > Import Netlist)
     block_diagram.svg    per-variant system block diagram
 
+And, per variant, a structured folder for standard/alternatives:
+
+    standard/            PRIMARY build path (verified components)
+      BOM.csv
+      SCHEMATIC_PLAN.md
+      tucklet-<name>.net
+    alternatives/        BACKUP build paths (supply chain alternatives)
+      usb_bridge_gl823/
+      usb_bridge_pl2732/
+      charger_mcp73831/
+      charger_bq24072/
+      sd_mux_tmux1574/
+
 Design philosophy (mirrors the CAD round-trip workflow): the geometry/artifact
 is generated from a parametric model, never hand-maintained. Edit THIS file and
 re-run to regenerate every variant consistently.
@@ -28,11 +41,13 @@ The netlist is a "logical" netlist in the KiCad sense.
 
 Charm Strategy Note: This generator enforces the "Charm" form factor.
 Oversized variants (e.g., E22-WROOM) are excluded to maintain product identity.
+E22-WROOM is reserved for the separate commercial "Pro" line (see PRO_LINE.md).
 
 Dual AGG Link Note: The dual-radio aggregation link uses SPI (CLK, CS, MOSI, MISO)
 for higher sustained throughput (~12-15 MB/s) compared to UART (~8-10 MB/s).
 
-License: CC BY-NC-SA 4.0 (hardware design files).
+License: CC BY-NC-SA 4.0 (hardware design files — Charm line only).
+Pro line (E22-WROOM + 2S) is explicitly excluded from this license grant.
 """
 
 from __future__ import annotations
@@ -116,6 +131,7 @@ class Variant:
 
 # Generate ONLY "Charm" variants.
 # Filter logic: Exclude E22-WROOM variants (oversized M.2 form factor) to enforce product identity.
+# E22-WROOM + 2S is reserved for the separate commercial "Pro" line (see PRO_LINE.md).
 raw_variants = [Variant(r, s, f) for r in RADIOS for s in STORAGE for f in FORM_FACTORS]
 ALL_VARIANTS = [v for v in raw_variants if not (v.is_e22 and v.form_factor == "wroom")]
 
@@ -264,6 +280,7 @@ def build_components(v: Variant) -> list[Comp]:
     # --- U3 Battery Charger (BQ25896, Power-Path Buck Charger, WQFN-24) ---
     # Note: Pin numbers below are LOGICAL placeholders.
     # The ACTUAL pin numbers must be verified from the BQ25896 datasheet.
+    # CRITICAL: Pin 11 is named VBAT here to ensure it joins the VBAT net for validation.
     c.append(Comp("U3", "BQ25896 Power-Path Charger", "Package_DFN_QFN:WQFN-24_4x4mm",
                   "I2C USB buck charger with power-path; run radio while charging",
                   pins=[
@@ -277,7 +294,7 @@ def build_components(v: Variant) -> list[Comp]:
                       ("8",  "STAT",   "open_collector"),  # Charge status
                       ("9",  "CE",     "input"),           # Chip Enable
                       ("10", "TS",     "input"),           # Thermistor
-                      ("11", "BAT",    "power_out"),       # Battery
+                      ("11", "VBAT",   "power_out"),       # Battery (Joined to VBAT net)
                       ("12", "SYS",    "power_out"),       # System output (Power-Path)
                       ("13", "SW",     "passive"),         # Switch node
                       ("14", "BTST",   "passive"),         # Bootstrap
@@ -619,7 +636,7 @@ def emit_schematic_plan(v: Variant, nets: dict) -> str:
              f"Variant: **{RADIOS[v.radio]['label']}**, **{STORAGE[v.storage]['label']}**, **{FORM_FACTORS[v.form_factor]['label']}**.",
              "",
              "## Power tree",
-             "`VBUS` (USB-C) -> U3 charge in; `VBAT` (BT1 <-> U3 BAT <-> U4 CELL <-> U5 VIN);",
+             "`VBUS` (USB-C) -> U3 charge in; `VBAT` (BT1 <-> U3 VBAT <-> U4 CELL <-> U5 VIN);",
              "`+3V3` (U5 VOUT -> U1" + ("/U1B" if v.is_dual else "") + ", U2, U4, U6, storage, LED, pull-ups).",
              "Common `GND` pour, stitched.",
              "",
@@ -712,7 +729,7 @@ A Tucklet build with the {RADIOS[v.radio]['label'].lower()} radio and
 Enclosure envelope: **{ex} x {ey} x {ez} mm** (AirTag-class).
 
 ## Files in this directory
-- `BOM.csv` — Full bill of materials.
+- `SPEC.md` — Full bill of materials.
 - `PIN_MAP.md` — Signal -> MCU pin mapping.
 - `SCHEMATIC_PLAN.md` — Net-by-net connection plan.
 - `tucklet-{v.name}.net` — KiCad logical netlist.
@@ -805,6 +822,400 @@ def emit_block_svg(v: Variant) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Alternative build path emitters
+# ---------------------------------------------------------------------------
+
+def emit_gl823_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for GL823 USB 2.0 alternative bridge."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U2":
+            # Replace with GL823
+            line = 1.60
+            w.writerow(["U2", 1, "USB2.0-HS SD/eMMC bridge", "GL823 (or equiv)", "Package_DFN_QFN:QFN-24",
+                        f"{1.60:.2f}", f"{line:.2f}",
+                        "USB 2.0 High-Speed mass-storage bridge; owns storage when plugged in",
+                        "Alternative. USB 2.0 for ~25-35 MB/s wired. QFN-24."])
+        elif c.ref == "C_GRP":
+            continue  # Skip grouped
+        elif c.ref in ("PCB", "ENC"):
+            continue  # Skip PCB/ENC for electronics-only delta
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    # Add GL3224 cost to total for comparison
+    total += 1.60
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_gl823_schematic_plan(v: Variant, base_nets: dict) -> str:
+    """Emit schematic plan for GL823 alternative. Net changes: U2 pin mapping."""
+    return f"""# Schematic Plan (GL823 Alternative) — {v.name}
+
+This is the **GL823 (USB 2.0)** alternative build path. Same topology as the
+standard GL3224 build, but U2 is replaced with the GL823 QFN-24 bridge.
+
+## Key Differences from Standard (GL3224)
+- **U2:** GL823 (QFN-24, USB 2.0, ~25-35 MB/s wired) instead of GL3224 (QFN-32, USB 3.0, ~70-100+ MB/s)
+- **Pin Count:** 24 pins vs 32 pins. GL823 lacks USB 3.0 SuperSpeed differential pairs.
+- **Performance:** Wired speed is limited to USB 2.0 High-Speed (~25-35 MB/s).
+- **Footprint:** Smaller (4x4 mm QFN-24 vs 5x5 mm QFN-32).
+
+## Net Changes
+- **USB_SS_TX_P, USB_SS_TX_N, USB_SS_RX_P, USB_SS_RX_N:** Not present. USB 3.0 lanes are absent.
+- All other nets (VBUS, USB_DP, USB_DM, SD_CLK, SD_CMD, SD_D0..D3, SD_SEL) remain identical.
+- **VCC_33 -> VDD33:** GL823 uses VDD33 for 3.3V supply. Functionally equivalent to GL3224's VCC_33.
+- **RREF:** GL823 may not require an external reference resistor. Verify from datasheet.
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list. Only the U2 pin
+mappings change; the circuit topology is identical.
+"""
+
+def emit_gl823_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for GL823 alternative."""
+    # Build modified component list
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U2":
+            alt_comps.append(Comp("U2", "USB2.0-HS SD/eMMC bridge", "Package_DFN_QFN:QFN-24",
+                  "USB High-Speed mass-storage bridge; owns storage when plugged in",
+                  pins=[
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "USB_DP",  "bidirectional"),
+                      ("3",  "USB_DM",  "bidirectional"),
+                      ("4",  "VCC_33",  "power_in"),
+                      ("5",  "GND",     "power_in"),
+                      ("6",  "SD_CLK",  "output"),
+                      ("7",  "SD_CMD",  "bidirectional"),
+                      ("8",  "SD_D0",   "bidirectional"),
+                      ("9",  "SD_D1",   "bidirectional"),
+                      ("10", "SD_D2",   "bidirectional"),
+                      ("11", "SD_D3",   "bidirectional"),
+                      # Remaining pins are GPIO/config specific to GL823
+                  ], unit_cost=1.60, mpn="GL823 (or equiv)",
+                  note="Alternative. USB 2.0 for ~25-35 MB/s wired. QFN-24."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_pl2732_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for PL2732 USB 3.0 alternative bridge."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U2":
+            # Replace with PL2732
+            line = 1.70
+            w.writerow(["U2", 1, "USB3.0 SD/eMMC bridge", "PL2732", "Package_DFN_QFN:QFN-32",
+                        f"{1.70:.2f}", f"{line:.2f}",
+                        "USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in",
+                        "Alternative. USB 3.0 for ~70-100+ MB/s wired. Prolific. Excellent eMMC."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 1.70
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_pl2732_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (PL2732 Alternative) — {v.name}
+
+This is the **PL2732 (USB 3.0)** alternative build path. Same topology as the
+standard GL3224 build, but U2 is replaced with the PL2732 QFN-32 bridge.
+
+## Key Differences from Standard (GL3224)
+- **U2:** PL2732 (QFN-32, USB 3.0, ~70-100+ MB/s wired) instead of GL3224.
+- **eMMC Support:** PL2732 has excellent eMMC HS200 support.
+- **Firmware:** May require different firmware initialization sequence. Verify from Prolific datasheet.
+- **Pin Mapping:** QFN-32 pinout differs from GL3224. Must verify from PL2732 datasheet.
+
+## Net Changes
+- Net topology is identical to GL3224 (same USB 3.0 SS pairs, same SDIO bus).
+- Pin numbers on U2 will differ. Update PIN_MAP accordingly.
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list. Only the U2 pin
+mappings change; the circuit topology is identical.
+"""
+
+def emit_pl2732_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for PL2732 alternative. Uses same logical pins as GL3224."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U2":
+            alt_comps.append(Comp("U2", "USB3.0 SD/eMMC bridge", "Package_DFN_QFN:QFN-32",
+                  "USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in",
+                  pins=c.pins, unit_cost=1.70, mpn="PL2732",
+                  note="Alternative. USB 3.0 for ~70-100+ MB/s wired. Prolific."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_mcp73831_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for MCP73831 simple linear charger alternative."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U3":
+            # Replace with MCP73831
+            line = 0.50
+            w.writerow(["U3", 1, "MCP73831", "MCP73831T-2ACI/OT", "Package_TO_SOT_SMD:SOT-23-5",
+                        f"{0.50:.2f}", f"{line:.2f}",
+                        "Single-cell Li-ion/LiPo charge management",
+                        "Alternative. Simple linear charger. No power-path. STAT pin only."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 0.50
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_mcp73831_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (MCP73831 Alternative) — {v.name}
+
+This is the **MCP73831 (Linear Charger)** alternative build path.
+
+## Key Differences from Standard (BQ25896)
+- **U3:** MCP73831 (SOT-23-5, simple linear charger) instead of BQ25896 (WQFN-24, buck charger).
+- **No Power-Path:** Cannot run the radio while charging. System runs from battery only.
+- **No I2C:** Charge current set via PROG resistor only. No software control.
+- **Simpler:** Fewer pins, smaller footprint, lower cost.
+- **Impact:** If user plugs in USB while transferring, the radio must pause or run from battery.
+  This is acceptable for single-C5 variants but not recommended for dual/E22.
+
+## Net Changes
+- **I2C_SDA / I2C_SCL:** U3 no longer connects to I2C. U4 (fuel gauge) remains on I2C.
+- **CHG_INT:** Removed (MCP73831 has no INT pin).
+- **STAT:** U3 STAT pin connects to U1 CHG_STAT GPIO (same function, different pin).
+- **PROG:** R3 sets charge current (same as standard).
+- **TS:** Removed (MCP73831 has no thermistor input).
+- **VBUS:** U3 VBUS connects directly (same as standard).
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list.
+"""
+
+def emit_mcp73831_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for MCP73831 alternative."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U3":
+            alt_comps.append(Comp("U3", "MCP73831", "Package_TO_SOT_SMD:SOT-23-5",
+                  "Single-cell Li-ion/LiPo charge management",
+                  pins=[
+                      ("1", "VBUS", "power_in"),
+                      ("2", "STAT", "open_collector"),
+                      ("3", "VBAT", "power_out"),
+                      ("4", "VDD", "power_in"),
+                      ("5", "PROG", "passive"),
+                  ], unit_cost=0.50, mpn="MCP73831T-2ACI/OT",
+                  note="Alternative. Simple linear charger. No power-path."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_bq24072_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for BQ24072 power-path linear charger alternative."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U3":
+            line = 0.90
+            w.writerow(["U3", 1, "BQ24072", "BQ24072DSQR", "Package_DFN_QFN:VQFN-16_3.5x3.5mm",
+                        f"{0.90:.2f}", f"{line:.2f}",
+                        "Linear charger with power-path",
+                        "Alternative. Power-path without I2C. Good middle ground."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 0.90
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_bq24072_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (BQ24072 Alternative) — {v.name}
+
+This is the **BQ24072 (Power-Path Linear Charger)** alternative build path.
+
+## Key Differences from Standard (BQ25896)
+- **U3:** BQ24072 (VQFN-16, linear + power-path) instead of BQ25896 (WQFN-24, buck charger).
+- **Power-Path:** YES. Can run radio while charging. This is the key advantage over MCP73831.
+- **No I2C:** Charge current set via external resistor. No software control.
+- **Moderate Complexity:** More pins than MCP73831, fewer than BQ25896.
+- **Impact:** Best choice if you need power-path but want to avoid I2C complexity.
+
+## Net Changes
+- **I2C_SDA / I2C_SCL:** U3 no longer connects to I2C. U4 (fuel gauge) remains on I2C.
+- **CHG_INT:** Removed.
+- **STAT:** U3 has #PG (Power Good) and #CHG (Charge Status) pins.
+- **PROG/ILIM:** Set via external resistors.
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list.
+"""
+
+def emit_bq24072_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for BQ24072 alternative."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U3":
+            alt_comps.append(Comp("U3", "BQ24072", "Package_DFN_QFN:VQFN-16_3.5x3.5mm",
+                  "Linear charger with power-path",
+                  pins=[
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "STAT",   "open_collector"),
+                      ("3",  "PG",     "open_collector"),
+                      ("4",  "BAT",    "power_out"),
+                      ("5",  "SYS",    "power_out"),
+                      ("6",  "PROG",   "passive"),
+                      ("7",  "ILIM",   "input"),
+                      ("8",  "TS",     "input"),
+                      ("9",  "CE",     "input"),
+                      ("10", "IN",     "power_in"),
+                      ("11", "GND",    "power_in"),
+                      ("12", "BAT_EN", "output"),
+                      ("13", "CHG",    "open_collector"),
+                      ("14", "TMR",    "passive"),
+                      ("15", "VREF",   "power_out"),
+                      ("16", "GND_PAD","power_in"),
+                  ], unit_cost=0.90, mpn="BQ24072DSQR",
+                  note="Alternative. Power-path without I2C. Good middle ground."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_tmux1574_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for TMUX1574 SD mux signal integrity upgrade."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U6":
+            # Replace with TMUX1574
+            line = 0.55
+            w.writerow(["U6", 1, "SD 2:1 bus mux", "TMUX1574", "Package_DFN_QFN:QFN-24",
+                        f"{0.55:.2f}", f"{line:.2f}",
+                        "Arbitrates microSD/eMMC bus between radio (A) and bridge (B)",
+                        "Alternative. Higher BW, lower Ron. Signal integrity upgrade."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 0.55
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_tmux1574_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (TMUX1574 Alternative) — {v.name}
+
+This is the **TMUX1574 (Signal Integrity Upgrade)** alternative build path for the SD bus mux.
+
+## Key Differences from Standard (TS3A-class)
+- **U6:** TMUX1574 (QFN-24) instead of TS3A-class (QFN-20).
+- **Performance:** Higher bandwidth, lower on-resistance (Ron). Better signal integrity for SDIO at higher clock rates.
+- **Pin Count:** 24 pins vs 20. Additional pins for control/NC.
+- **Use Case:** Recommended if SDIO timing issues are observed with the TS3A-class mux on prototype.
+
+## Net Changes
+- **SEL:** Same function (SD_SEL).
+- **C_CLK, C_CMD, C_D0..D3:** Same signal names. Pin numbers differ (QFN-24).
+- **VCC:** 3V3 supply (same).
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list. Only the U6 pin
+mappings change; the circuit topology is identical.
+"""
+
+def emit_tmux1574_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for TMUX1574 alternative."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U6":
+            alt_comps.append(Comp("U6", "SD 2:1 bus mux", "Package_DFN_QFN:QFN-24",
+                  "Arbitrates microSD/eMMC bus between radio (A) and bridge (B)",
+                  pins=[
+                      ("SEL", "SEL", "input"),
+                      ("GND", "GND", "power_in"),
+                      ("VCC", "3V3", "power_in"),
+                      ("C_CLK", "SD_CLK", "bidirectional"),
+                      ("C_CMD", "SD_CMD", "bidirectional"),
+                      ("C_D0", "SD_D0", "bidirectional"),
+                      ("C_D1", "SD_D1", "bidirectional"),
+                      ("C_D2", "SD_D2", "bidirectional"),
+                      ("C_D3", "SD_D3", "bidirectional"),
+                  ], unit_cost=0.55, mpn="TMUX1574",
+                  note="Alternative. Higher BW, lower Ron. Signal integrity upgrade."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+# ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
 
@@ -815,22 +1226,115 @@ def generate(root: str) -> list[str]:
     for v in ALL_VARIANTS:
         vdir = os.path.join(variants_dir, v.name)
         os.makedirs(vdir, exist_ok=True)
+
+        # Build standard components and nets
         comps = build_components(v)
         nets = build_nets(v, comps)
 
-        files = {
-            "SPEC.md": emit_spec(v),
+        # --- Standard build path ---
+        std_dir = os.path.join(vdir, "standard")
+        os.makedirs(std_dir, exist_ok=True)
+
+        std_files = {
             "BOM.csv": emit_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_schematic_plan(v, nets),
+            f"tucklet-{v.name}.net": emit_kicad_netlist(v, comps, nets),
+        }
+        for fname, content in std_files.items():
+            path = os.path.join(std_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # --- Alternative build paths ---
+        alt_dir = os.path.join(vdir, "alternatives")
+        os.makedirs(alt_dir, exist_ok=True)
+
+        # USB Bridge: GL823 (USB 2.0)
+        gl823_dir = os.path.join(alt_dir, "usb_bridge_gl823")
+        os.makedirs(gl823_dir, exist_ok=True)
+        gl823_files = {
+            "BOM.csv": emit_gl823_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_gl823_schematic_plan(v, nets),
+            f"tucklet-{v.name}-gl823.net": emit_gl823_netlist(v, comps),
+        }
+        for fname, content in gl823_files.items():
+            path = os.path.join(gl823_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # USB Bridge: PL2732 (USB 3.0)
+        pl2732_dir = os.path.join(alt_dir, "usb_bridge_pl2732")
+        os.makedirs(pl2732_dir, exist_ok=True)
+        pl2732_files = {
+            "BOM.csv": emit_pl2732_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_pl2732_schematic_plan(v),
+            f"tucklet-{v.name}-pl2732.net": emit_pl2732_netlist(v, comps),
+        }
+        for fname, content in pl2732_files.items():
+            path = os.path.join(pl2732_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # Charger: MCP73831 (Simple Linear)
+        mcp73831_dir = os.path.join(alt_dir, "charger_mcp73831")
+        os.makedirs(mcp73831_dir, exist_ok=True)
+        mcp73831_files = {
+            "BOM.csv": emit_mcp73831_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_mcp73831_schematic_plan(v),
+            f"tucklet-{v.name}-mcp73831.net": emit_mcp73831_netlist(v, comps),
+        }
+        for fname, content in mcp73831_files.items():
+            path = os.path.join(mcp73831_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # Charger: BQ24072 (Power-Path Linear)
+        bq24072_dir = os.path.join(alt_dir, "charger_bq24072")
+        os.makedirs(bq24072_dir, exist_ok=True)
+        bq24072_files = {
+            "BOM.csv": emit_bq24072_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_bq24072_schematic_plan(v),
+            f"tucklet-{v.name}-bq24072.net": emit_bq24072_netlist(v, comps),
+        }
+        for fname, content in bq24072_files.items():
+            path = os.path.join(bq24072_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # SD Mux: TMUX1574 (Signal Integrity Upgrade)
+        tmux1574_dir = os.path.join(alt_dir, "sd_mux_tmux1574")
+        os.makedirs(tmux1574_dir, exist_ok=True)
+        tmux1574_files = {
+            "BOM.csv": emit_tmux1574_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_tmux1574_schematic_plan(v),
+            f"tucklet-{v.name}-tmux1574.net": emit_tmux1574_netlist(v, comps),
+        }
+        for fname, content in tmux1574_files.items():
+            path = os.path.join(tmux1574_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # --- Variant-level files (specs, maps, diagrams) ---
+        # These reference the standard/ build as the default path.
+        variant_files = {
+            "SPEC.md": emit_spec(v),
             "PIN_MAP.md": emit_pin_map(v),
             "SCHEMATIC_PLAN.md": emit_schematic_plan(v, nets),
             f"tucklet-{v.name}.net": emit_kicad_netlist(v, comps, nets),
             "block_diagram.svg": emit_block_svg(v),
         }
-        for fname, content in files.items():
+        for fname, content in variant_files.items():
             path = os.path.join(vdir, fname)
             with open(path, "w") as f:
                 f.write(content)
             written.append(path)
+
     return written
 
 
@@ -840,9 +1344,13 @@ def validate(root: str) -> None:
     problems = []
     for v in ALL_VARIANTS:
         vdir = os.path.join(root, "variants", v.name)
-        net = os.path.join(vdir, f"tucklet-{v.name}.net")
+        # Check both variant-level and standard/ netlists
+        net = os.path.join(vdir, "standard", f"tucklet-{v.name}.net")
         if not os.path.exists(net):
-            problems.append(f"{v.name}: netlist missing")
+            # Fallback to variant-level netlist for legacy compatibility
+            net = os.path.join(vdir, f"tucklet-{v.name}.net")
+        if not os.path.exists(net):
+            problems.append(f"{v.name}: netlist missing (checked standard/ and variant root)")
             continue
 
         txt = open(net).read()

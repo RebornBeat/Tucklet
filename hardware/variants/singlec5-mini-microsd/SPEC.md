@@ -22,7 +22,7 @@ Push-push microSD socket, SDIO 4-bit. Customer supplies/upgrades the card.
 Enclosure envelope: **35 x 28 x 9 mm** (AirTag-class).
 
 ## Files in this directory
-- `BOM.csv` — Full bill of materials.
+- `SPEC.md` — Full bill of materials.
 - `PIN_MAP.md` — Signal -> MCU pin mapping.
 - `SCHEMATIC_PLAN.md` — Net-by-net connection plan.
 - `tucklet-singlec5-mini-microsd.net` — KiCad logical netlist.

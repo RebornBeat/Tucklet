@@ -1,0 +1,27 @@
+ref,qty,value,mpn,footprint,unit_cost_usd,line_cost_usd,description,note
+U1,1,ESP32-E22-MINI-1,ESP32-E22-MINI-1,RF_Module:Espressif_ESP32-E22_MINI-1,4.20,4.20,Wi-Fi 6E + BLE 5.4 Radio Co-Processor (Projected/Future),Projected component; roadmap item pending official release.
+U1B,1,ESP32-E22-MINI-1,ESP32-E22-MINI-1,RF_Module:Espressif_ESP32-E22_MINI-1,4.20,4.20,Second radio for link aggregation,Projected component; roadmap item pending official release.
+U2,1,GL3224 USB 3.0 SD Bridge,GL3224-OEM,Package_DFN_QFN:QFN-32,1.80,1.80,USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in,"Primary. USB 3.0 for ~70-100+ MB/s wired. QFN-32 single-LUN. Pin mapping must be verified from GL3224 datasheet. USB 3.0 SS pins may be NC in USB 2.0 fallback. Backup: GL823 (QFN-24, USB 2.0)."
+U3,1,BQ24072,BQ24072DSQR,Package_DFN_QFN:VQFN-16_3.5x3.5mm,0.90,0.90,Linear charger with power-path,Alternative. Power-path without I2C. Good middle ground.
+U4,1,MAX17048,MAX17048G+T10,Package_DFN_QFN:TDFN-8-1EP_3x3mm,0.80,0.80,I2C fuel gauge (real battery percent),
+U5,1,3V3 buck (>=2A for E22),TPS62840-class,Package_TO_SOT_SMD:SOT-23-6,1.20,1.20,"Step-down regulator, sized for Wi-Fi TX peak",
+U6,1,SD 2:1 bus mux,TS3A-class 2:1,Package_DFN_QFN:QFN-20,0.45,0.45,Arbitrates microSD/eMMC bus between radio (A) and bridge (B),
+J1,1,USB-C receptacle,USB4105-GF-A-060 (or equiv),Connector_USB:USB_C_Receptacle_USB2.0_16P,0.30,0.30,Charge + wired data + CC,
+D1,1,USB ESD array,USBLC6-2SC6,Package_TO_SOT_SMD:SOT-23-6,0.20,0.20,TVS protection on D+/D-/VBUS,
+R1,1,5.1k,RC0402FR-075K1L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,USB-C CC1 pulldown (sink role),
+R2,1,5.1k,RC0402FR-075K1L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,USB-C CC2 pulldown (sink role),
+R3,1,2k,RC0402FR-072KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,BQ25896 PROG (sets ~500mA charge; size to cell),
+R4,1,4.7k,RC0402FR-074K7L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,I2C SDA pull-up,
+R5,1,4.7k,RC0402FR-074K7L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,I2C SCL pull-up,
+R6,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,Button pull-up,
+SW1,1,tactile button,B3U-1000P,Button_Switch_SMD:SW_SPST_B3U-1000P,0.10,0.10,Pair / factory-reset (press patterns),
+LED1,1,WS2812B,WS2812B-2020,LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm,0.20,0.20,Addressable RGB status LED,
+R7,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_CMD pull-up,
+R8,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D0 pull-up,
+R9,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D1 pull-up,
+R10,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D2 pull-up,
+R11,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D3 pull-up,
+J2,1,microSD push-push socket,DM3D-SF,Connector_Card:microSD_HC_Hirose_DM3D-SF,0.40,0.40,User-swappable microSD (SDIO 4-bit),
+BT1,1,LiPo 300-500mAh + PCM,cell + JST-ACH or solder pads,Connector:Conn_01x02_Pin,3.50,3.50,Single-cell LiPo with protection circuit,
+
+TOTAL_ELECTRONICS,,,,,,18.36,,

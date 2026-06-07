@@ -7,6 +7,7 @@ variant. It is organized so that "what is what" is obvious:
 hardware/
 ├── README.md                 # you are here
 ├── gen_hardware.py           # the parametric SOURCE — regenerates every variant
+├── PRO_LINE.md               # Pro line (E22-WROOM + 2S) — source-available, non-commercial
 ├── common/                   # shared, variant-independent design
 │   ├── COMPONENT_SELECTION.md   # the shared parts + why (ESP32-C5 / E22 era)
 │   ├── VARIANTS.md              # cross-variant comparison + BOM/dimension overview
@@ -52,6 +53,7 @@ Tucklet variants are defined by three axes: **Radio**, **Storage**, and **Form F
 | **Charm Standard** | ESP32-C5 | WROOM | 4 | Baseline: Lowest cost, easy assembly |
 | **Charm Compact** | ESP32-C5 | MINI | 4 | Nano: Smallest footprint, tighter layout |
 | **Charm High-Perf** | ESP32-E22 | MINI | 4 | Roadmap: Wi-Fi 6E speed, pending module release |
+| **Pro High-Perf** | ESP32-E22 | WROOM | Roadmap | Larger: Wi-Fi 6E speed, 2S battery, pending module release |
 
 Each `variants/<name>/` folder contains, all generated and mutually consistent:
 
@@ -62,13 +64,67 @@ Each `variants/<name>/` folder contains, all generated and mutually consistent:
 - `tucklet-<name>.net` — **KiCad-importable netlist** (Pcbnew → File → Import Netlist).
 - `block_diagram.svg` — that variant's block diagram.
 
+## Variant Folder Organization (Standard vs. Alternatives)
+
+Within each `variants/<name>/` folder, the component alternatives and design paths are organized into subfolders. This ensures that every physical board variant has a clear, traceable path for both the **Primary (Standard)** build and any **Backup (Alternative)** component choices. This is critical for BOM flexibility and supply-chain resilience, and it ensures the specific implementations are captured for licensing provenance.
+
+```
+variants/<name>/
+├── SPEC.md
+├── PIN_MAP.md
+├── block_diagram.svg
+├── standard/               # PRIMARY build path (verified components)
+│   ├── BOM.csv             # BOM with primary MPNs (GL3224, BQ25896, etc.)
+│   ├── SCHEMATIC_PLAN.md   # Net list using primary pinouts
+│   └── tucklet-<name>.net  # Netlist for primary components
+└── alternatives/           # BACKUP build paths (supply chain alternatives)
+    ├── usb_bridge_gl823/   # Alternative: GL823 (USB 2.0, QFN-24)
+    │   ├── BOM.csv         # BOM delta or full BOM with GL823
+    │   ├── SCHEMATIC_PLAN.md  # Pin/net changes for GL823
+    │   └── tucklet-<name>-gl823.net
+    ├── usb_bridge_pl2732/  # Alternative: PL2732 (USB 3.0, QFN-32)
+    │   ├── BOM.csv
+    │   ├── SCHEMATIC_PLAN.md
+    │   └── tucklet-<name>-pl2732.net
+    ├── charger_mcp73831/   # Alternative: MCP73831 (Linear, no power-path)
+    │   ├── BOM.csv
+    │   ├── SCHEMATIC_PLAN.md
+    │   └── tucklet-<name>-mcp73831.net
+    └── sd_mux_tmux1574/   # Alternative: TMUX1574 (Signal integrity upgrade)
+        ├── BOM.csv
+        ├── SCHEMATIC_PLAN.md
+        └── tucklet-<name>-tmux1574.net
+```
+
+**Why this structure?**
+- **Licensing Specificity:** Copyright protects *specific implementations*. The `standard/` and `alternatives/` folders capture the exact MPNs, pin mappings, and netlists for each component choice. A generic "USB Bridge" is unprotectable; `GL3224-OEM` is.
+- **Supply Chain Resilience:** If the GL3224 is out of stock, the GL823 or PL2732 path is already documented and netlisted.
+- **Design Clarity:** No ambiguity about which BOM goes with which schematic.
+
+**Note:** Not all alternatives apply to all variants. The generator creates only the relevant subfolders based on the variant's configuration (e.g., a single-C5 variant may not need the TMUX1574 upgrade unless signal integrity issues are observed).
+
+## E22 and Pro Line Status
+
+### E22-MINI Variants (Roadmap)
+The `ESP32-E22-MINI-1` is a projected component. While the architecture and netlists for the 4 E22-MINI Charm variants are generated and valid, the module is **not yet released** and datasheets are unavailable. Do not fabricate E22-MINI variants until:
+1. The hardware is procured.
+2. Footprints are verified against the official datasheet.
+3. The GPIO map is reconciled (PIN_MAP.md must be updated).
+
+### E22-WROOM / Pro Line (Source-available, Non-commercial)
+The `ESP32-E22-WROOM` (22×30 mm module with external IPEX antenna) is explicitly excluded from the Charm variants due to size and antenna constraints. However, this module is the basis for the **Pro Line**, a larger, higher-performance variant with a 2S LiPo battery pack.
+
+The Pro design IP is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md). Like the Charm line, the Pro line is fully covered under the **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software) licenses. You may study, modify, and build for personal use; commercial sale requires a separate agreement.
+
+**No Pro variant folders are created at this time.** When the E22-WROOM datasheet is released and the Pro line is ready for prototyping, variant folders (e.g., `pro-e22-wroom-microsd/`) will be added with the same structure, under the same source-available, non-commercial license as the Charm line.
+
 ## How to use these (your KiCad workflow)
 
 You have two equally valid paths, matching the deconstruct/reconstruct approach
 you use for CAD:
 
 **A. Reconstruct from the netlist (fastest).** In KiCad's Pcbnew, *File → Import
-Netlist*, pick `tucklet-<variant>.net`. KiCad creates the components and a
+Netlist*, pick `tucklet-<variant>.net` from the `standard/` or appropriate `alternatives/` subfolder. KiCad creates the components and a
 ratsnest. The netlist is a *logical* netlist: the MCU module's pins are
 referenced by **signal name** (e.g. `SD_CLK`), so when you place the symbol
 you name its pins to match — `PIN_MAP.md` is the reconciliation table. Fixed

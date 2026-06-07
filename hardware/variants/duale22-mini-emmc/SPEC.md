@@ -38,7 +38,7 @@ Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
 Enclosure envelope: **32 x 24 x 8 mm** (AirTag-class).
 
 ## Files in this directory
-- `BOM.csv` — Full bill of materials.
+- `SPEC.md` — Full bill of materials.
 - `PIN_MAP.md` — Signal -> MCU pin mapping.
 - `SCHEMATIC_PLAN.md` — Net-by-net connection plan.
 - `tucklet-duale22-mini-emmc.net` — KiCad logical netlist.
