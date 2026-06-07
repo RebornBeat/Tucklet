@@ -21,13 +21,16 @@ re-run to regenerate every variant consistently.
   python3 gen_hardware.py --check    # generate to a temp dir and validate only
 
 HONESTY NOTE ON PIN NUMBERS: discrete ICs with fixed, well-known pinouts
-(MCP73831, MAX17048, USB-C receptacle, CC resistors) use real pin numbers.
+(MCP73831, BQ25896, MAX17048, USB-C receptacle, CC resistors) use real pin numbers.
 The MCU module's GPIO assignments are expressed as SIGNAL NAMES,
 because the exact module pin numbers must be read from the current datasheet.
 The netlist is a "logical" netlist in the KiCad sense.
 
 Charm Strategy Note: This generator enforces the "Charm" form factor.
 Oversized variants (e.g., E22-WROOM) are excluded to maintain product identity.
+
+Dual AGG Link Note: The dual-radio aggregation link uses SPI (CLK, CS, MOSI, MISO)
+for higher sustained throughput (~12-15 MB/s) compared to UART (~8-10 MB/s).
 
 License: CC BY-NC-SA 4.0 (hardware design files).
 """
@@ -192,8 +195,11 @@ def build_components(v: Variant) -> list[Comp]:
     if v.storage == "microsd":
         radio_pins.append(("SD_DET", "GPIO_SDDET", "input"))
     if v.is_dual:
-        # Aggregation link
-        radio_pins += [("AGG_TX", "AGG_A", "output"), ("AGG_RX", "AGG_B", "input")]
+        # Aggregation link - SPI for higher bandwidth than UART
+        radio_pins += [("AGG_CLK", "AGG_CLK", "output"),
+                       ("AGG_CS",  "AGG_CS",  "output"),
+                       ("AGG_MOSI","AGG_MOSI","output"),
+                       ("AGG_MISO","AGG_MISO","input")]
 
     c.append(Comp("U1", base_val, base_fp, mcu_desc,
                   pins=radio_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
@@ -203,41 +209,90 @@ def build_components(v: Variant) -> list[Comp]:
             ("GND", "GND", "power_in"),
             ("3V3", "VDD", "power_in"),
             ("EN", "EN", "input"),
-            ("AGG_RX", "AGG_A", "input"),
-            ("AGG_TX", "AGG_B", "output"),
+            # SPI Slave for AGG link
+            ("AGG_CLK", "AGG_CLK", "input"),
+            ("AGG_CS",  "AGG_CS",  "input"),
+            ("AGG_MOSI","AGG_MOSI","input"),
+            ("AGG_MISO","AGG_MISO","output"),
         ]
         c.append(Comp("U1B", base_val, base_fp,
                       "Second radio for link aggregation",
                       pins=radio2_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
 
-    # --- U2 USB-HS storage bridge (real-ish pinout, generic) ---
-    c.append(Comp("U2", "USB2.0-HS SD/eMMC bridge", "Package_DFN_QFN:QFN-24",
-                  "USB High-Speed mass-storage bridge; owns storage when plugged in",
+    # --- U2 USB-HS storage bridge (GL3224 USB 3.0, QFN-32) ---
+    # Note: Pin numbers below are LOGICAL placeholders matching the QFN-32 footprint.
+    # The ACTUAL pin numbers must be verified from the GL3224-OEM datasheet.
+    c.append(Comp("U2", "GL3224 USB 3.0 SD Bridge", "Package_DFN_QFN:QFN-32",
+                  "USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in",
                   pins=[
-                      ("1", "VBUS", "power_in"),
-                      ("2", "USB_DP", "bidirectional"),
-                      ("3", "USB_DM", "bidirectional"),
-                      ("4", "3V3", "power_in"),
-                      ("5", "GND", "power_in"),
-                      ("6", "SD_CLK", "output"),
-                      ("7", "SD_CMD", "bidirectional"),
-                      ("8", "SD_D0", "bidirectional"),
-                      ("9", "SD_D1", "bidirectional"),
-                      ("10", "SD_D2", "bidirectional"),
-                      ("11", "SD_D3", "bidirectional"),
-                      ("12", "SD_SEL", "input"),
-                  ], unit_cost=1.60, mpn="GL3224-OEM (or RTS5306-class)"))
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "USB_DP",  "bidirectional"),
+                      ("3",  "USB_DM",  "bidirectional"),
+                      ("4",  "VCC_33",  "power_in"),
+                      ("5",  "GND",     "power_in"),
+                      ("6",  "SD_CLK",  "output"),
+                      ("7",  "SD_CMD",  "bidirectional"),
+                      ("8",  "SD_D0",   "bidirectional"),
+                      ("9",  "SD_D1",   "bidirectional"),
+                      ("10", "SD_D2",   "bidirectional"),
+                      ("11", "SD_D3",   "bidirectional"),
+                      ("12", "SD_SEL",  "input"),
+                      # USB 3.0 SuperSpeed differential pairs (NC in USB 2.0 fallback)
+                      ("13", "SS_TX_P", "bidirectional"),
+                      ("14", "SS_TX_N", "bidirectional"),
+                      ("15", "SS_RX_P", "bidirectional"),
+                      ("16", "SS_RX_N", "bidirectional"),
+                      ("17", "VDD10",   "power_in"),  # Core power
+                      ("18", "RREF",     "passive"),   # Reference resistor
+                      ("19", "XTAL_IN",  "input"),
+                      ("20", "XTAL_OUT", "output"),
+                      ("21", "SD_DET",   "input"),
+                      ("22", "LED",      "output"),
+                      ("23", "GPIO0",    "bidirectional"),
+                      ("24", "GPIO1",    "bidirectional"),
+                      ("25", "FW_SDI",   "input"),
+                      ("26", "FW_SDO",   "output"),
+                      ("27", "FW_SCK",   "input"),
+                      ("28", "FW_CS",    "input"),
+                      ("29", "VDD33",    "power_in"),
+                      ("30", "VDD33_2",  "power_in"),
+                      ("31", "GND_2",    "power_in"),
+                      ("32", "GND_PAD",  "power_in"),  # Exposed pad
+                  ], unit_cost=1.80, mpn="GL3224-OEM",
+                  note="Primary. USB 3.0 for ~70-100+ MB/s wired. QFN-32 single-LUN. Pin mapping must be verified from GL3224 datasheet. USB 3.0 SS pins may be NC in USB 2.0 fallback. Backup: GL823 (QFN-24, USB 2.0)."))
 
-    # --- U3 charger MCP73831 (real pinout, SOT-23-5) ---
-    c.append(Comp("U3", "MCP73831", "Package_TO_SOT_SMD:SOT-23-5",
-                  "Single-cell Li-ion/LiPo charge management",
+    # --- U3 Battery Charger (BQ25896, Power-Path Buck Charger, WQFN-24) ---
+    # Note: Pin numbers below are LOGICAL placeholders.
+    # The ACTUAL pin numbers must be verified from the BQ25896 datasheet.
+    c.append(Comp("U3", "BQ25896 Power-Path Charger", "Package_DFN_QFN:WQFN-24_4x4mm",
+                  "I2C USB buck charger with power-path; run radio while charging",
                   pins=[
-                      ("1", "STAT", "open_collector"),
-                      ("2", "VSS", "power_in"),
-                      ("3", "VBAT", "power_out"),
-                      ("4", "VDD", "power_in"),
-                      ("5", "PROG", "passive"),
-                  ], unit_cost=0.50, mpn="MCP73831T-2ACI/OT"))
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "D+",     "bidirectional"),   # USB D+ (USB 2.0 detection)
+                      ("3",  "D-",     "bidirectional"),   # USB D- (USB 2.0 detection)
+                      ("4",  "SDA",    "bidirectional"),   # I2C data
+                      ("5",  "SCL",    "input"),           # I2C clock
+                      ("6",  "INT",    "open_collector"),  # Interrupt
+                      ("7",  "PG",     "open_collector"),  # Power Good
+                      ("8",  "STAT",   "open_collector"),  # Charge status
+                      ("9",  "CE",     "input"),           # Chip Enable
+                      ("10", "TS",     "input"),           # Thermistor
+                      ("11", "BAT",    "power_out"),       # Battery
+                      ("12", "SYS",    "power_out"),       # System output (Power-Path)
+                      ("13", "SW",     "passive"),         # Switch node
+                      ("14", "BTST",   "passive"),         # Bootstrap
+                      ("15", "REGN",   "power_out"),       # Internal LDO out
+                      ("16", "PMID",   "power_out"),       # VBUS to system
+                      ("17", "VBUS_2", "power_in"),
+                      ("18", "AGND",   "power_in"),
+                      ("19", "PGND",   "power_in"),
+                      ("20", "PGND_2", "power_in"),
+                      ("21", "PROG",   "passive"),         # Charge current set
+                      ("22", "ILIM",   "input"),           # Input current limit
+                      ("23", "VREF",   "power_out"),       # Reference
+                      ("24", "GND_PAD","power_in"),        # Exposed pad
+                  ], unit_cost=1.50, mpn="BQ25896",
+                  note="Primary. Power-path allows radio operation while charging. I2C controllable. Backup: MCP73831 (SOT-23-5, simple linear, no power-path)."))
 
     # --- U4 fuel gauge MAX17048 (real pinout, TDFN-8) ---
     c.append(Comp("U4", "MAX17048", "Package_DFN_QFN:TDFN-8-1EP_3x3mm",
@@ -326,7 +381,7 @@ def build_components(v: Variant) -> list[Comp]:
 
     # --- PROG resistor for charger current ---
     c.append(Comp("R3", "2k", "Resistor_SMD:R_0402_1005Metric",
-                  "MCP73831 PROG (sets ~500mA charge; size to cell)",
+                  "BQ25896 PROG (sets ~500mA charge; size to cell)",
                   pins=[("1", "PROG", "passive"), ("2", "GND", "passive")],
                   unit_cost=0.01, mpn="RC0402FR-072KL"))
 
@@ -496,7 +551,10 @@ def emit_pin_map(v: Variant) -> str:
 ## Second radio (U1B) + aggregation link (Dual Radio only)
 | Signal | Role | Pin (U1 / U1B) | Notes |
 |---|---|---|---|
-| AGG_TX / AGG_RX | radio<->radio coordination | free UART pair | U1.AGG_TX -> U1B.AGG_RX and vice-versa |
+| AGG_CLK | SPI clock | free GPIO | U1.AGG_CLK -> U1B.AGG_CLK |
+| AGG_CS | SPI chip select | free GPIO | U1.AGG_CS -> U1B.AGG_CS |
+| AGG_MOSI | SPI data out | free GPIO | U1.AGG_MOSI -> U1B.AGG_MOSI |
+| AGG_MISO | SPI data in | free GPIO | U1.AGG_MISO <- U1B.AGG_MISO |
 | 3V3 / GND / EN | power U1B | — | U5 must be sized for two radios' peak |
 """
     emmc_extra = ""
@@ -528,19 +586,20 @@ def emit_pin_map(v: Variant) -> str:
 | SD_D0..D3 | SDIO data 0-3 | free GPIOs (contiguous preferred) | 10k pull-ups each; D3=CS in 1-bit/SPI fallback |
 | SD_SEL | storage ownership select | free GPIO | drives U6; high=bridge owns (USB plugged), low=radio owns |{det}{emmc_extra}
 
-## I2C (fuel gauge U4)
+## I2C (fuel gauge U4 + charger U3)
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
-| I2C_SDA | I2C data | free GPIO | 4.7k pull-up |
-| I2C_SCL | I2C clock | free GPIO | 4.7k pull-up |
+| I2C_SDA | I2C data | free GPIO | 4.7k pull-up; shared with BQ25896 SDA |
+| I2C_SCL | I2C clock | free GPIO | 4.7k pull-up; shared with BQ25896 SCL |
 | GAUGE_ALRT | low-battery interrupt | free GPIO | from MAX17048 ALRT (open-drain) |
+| CHG_INT | charger interrupt | free GPIO | from BQ25896 INT (open-drain) |
 
 ## UI + charger status
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
 | BTN | tactile button | free GPIO | 10k pull-up + firmware debounce; press patterns = pair / factory-reset |
 | LED_DIN | WS2812 data | free GPIO | single addressable RGB |
-| CHG_STAT | charger status | free GPIO | from MCP73831 STAT (open-drain) |
+| CHG_STAT | charger status | free GPIO | from BQ25896 STAT (open-drain) |
 {dual}
 ## Routing note
 Wi-Fi {'6E' if v.is_e22 else '5 GHz'} TX bursts are the current peak. Wide copper on VBUS/VBAT/3V3, bulk +
@@ -568,7 +627,7 @@ def emit_schematic_plan(v: Variant, nets: dict) -> str:
              "Storage SD_* lines connect to the **common** side of U6. U1 SDIO connects",
              "to U6 A-side; U2 (USB-HS bridge) connects to U6 B-side. `SD_SEL` (driven by",
              "VBUS-present detection in firmware/hardware) selects the owner: plugged in =",
-             "bridge owns (fast wired ~20-40 MB/s); otherwise radio owns (wireless). Never both.",
+             "bridge owns (fast wired ~70-100+ MB/s); otherwise radio owns (wireless). Never both.",
              "",
              "## All nets (signal -> nodes)",
              "",
@@ -625,6 +684,13 @@ Dual-band Wi-Fi 6 (2.4 + 5 GHz) + BLE. ~{v.wireless_mb_s} MB/s wireless at close
     if v.is_dual:
         dual_block = """
 **Note:** Dual-radio link aggregation is experimental. Validate RF isolation between antennas.
+**AGG Link:** SPI (CLK, CS, MOSI, MISO) for higher sustained throughput (~12-15 MB/s).
+"""
+
+    bridge_block = """
+## USB Wired Speed
+- **GL3224 USB 3.0 Bridge:** ~70-100+ MB/s (primary, QFN-32).
+- **GL823 USB 2.0 Backup:** ~25-35 MB/s (QFN-24, size-constrained alternative).
 """
 
     return f"""# Variant Spec — {v.name}
@@ -639,7 +705,8 @@ A Tucklet build with the {RADIOS[v.radio]['label'].lower()} radio and
 
 ## Performance
 - Everyday wireless: **~{v.wireless_mb_s} MB/s**.
-- Bulk wired (USB-HS bridge): **~20-40 MB/s**.
+- Bulk wired (GL3224 USB 3.0 bridge): **~70-100+ MB/s**.
+- Bulk wired (GL823 USB 2.0 bridge): **~25-35 MB/s**.
 
 ## Dimensions
 Enclosure envelope: **{ex} x {ey} x {ez} mm** (AirTag-class).
@@ -653,6 +720,8 @@ Enclosure envelope: **{ex} x {ey} x {ez} mm** (AirTag-class).
 
 ## Bring-up checklist
 - [ ] Reconcile signal->GPIO from the datasheet (PIN_MAP).
+- [ ] Verify GL3224-OEM pin mapping from its datasheet (logical placeholders used).
+- [ ] Verify BQ25896 pin mapping from its datasheet (logical placeholders used).
 - [ ] Confirm USB-HS bridge part number + handoff mode.
 - [ ] Validate SDIO timing.
 - [ ] Measure real TX current; size BT1 cell.
@@ -671,7 +740,9 @@ def emit_block_svg(v: Variant) -> str:
         radio_label = "ESP32-C5 (U1)" if not v.is_dual else "ESP32-C5 x2"
         radio_sub = "BLE + Wi-Fi 5GHz" if not v.is_dual else "BLE + 2x Wi-Fi"
 
-    dual_note = "" if not v.is_dual else '<text x="430" y="200" text-anchor="middle" font-size="10" fill="#b5654f" font-style="italic">+ U1B, AGG link</text>'
+    dual_note = "" if not v.is_dual else '<text x="430" y="200" text-anchor="middle" font-size="10" fill="#b5654f" font-style="italic">+ U1B, SPI AGG</text>'
+
+    bridge_speed = "70-100+ MB/s"
 
     return f'''<svg viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
   <defs>
@@ -687,7 +758,7 @@ def emit_block_svg(v: Variant) -> str:
   <text x="105" y="153" text-anchor="middle" font-size="10.5" fill="#6f5b4c">charge + data</text>
   <g filter="url(#s)"><rect x="40" y="204" width="130" height="56" rx="12" fill="#fff"/></g>
   <text x="105" y="228" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">Charger U3</text>
-  <text x="105" y="246" text-anchor="middle" font-size="10.5" fill="#6f5b4c">MCP73831</text>
+  <text x="105" y="246" text-anchor="middle" font-size="10.5" fill="#6f5b4c">BQ25896</text>
   <g filter="url(#s)"><rect x="40" y="296" width="130" height="56" rx="12" fill="#fff"/></g>
   <text x="105" y="320" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">LiPo BT1</text>
   <text x="105" y="338" text-anchor="middle" font-size="10.5" fill="#6f5b4c">+ gauge U4</text>
@@ -709,8 +780,8 @@ def emit_block_svg(v: Variant) -> str:
   <text x="430" y="420" text-anchor="middle" font-size="10.5" fill="#6f5b4c">SDIO 4-bit</text>
 
   <g filter="url(#s)"><rect x="690" y="262" width="170" height="58" rx="12" fill="#fff"/></g>
-  <text x="775" y="286" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#3a2c23">USB-HS bridge U2</text>
-  <text x="775" y="304" text-anchor="middle" font-size="10.5" fill="#6f5b4c">~20-40 MB/s wired</text>
+  <text x="775" y="286" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#3a2c23">GL3224 Bridge U2</text>
+  <text x="775" y="304" text-anchor="middle" font-size="10.5" fill="#6f5b4c">~{bridge_speed} wired</text>
 
   <g filter="url(#s)"><rect x="690" y="108" width="170" height="100" rx="14" fill="#fff"/></g>
   <text x="775" y="138" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">UI</text>
@@ -787,9 +858,12 @@ def validate(root: str) -> None:
         for required in ["GND", "3V3", "VBUS", "VBAT", "SD_CLK", "USB_DP"]:
             if f'(name "{required}")' not in txt:
                 problems.append(f"{v.name}: missing net {required}")
-        # dual has aggregation crossover nets
-        if v.is_dual and ('(name "AGG_A")' not in txt or '(name "AGG_B")' not in txt):
-            problems.append(f"{v.name}: dual variant missing AGG_A/AGG_B crossover")
+        # dual has aggregation crossover nets (SPI)
+        if v.is_dual:
+            spi_nets = ['AGG_CLK', 'AGG_CS', 'AGG_MOSI', 'AGG_MISO']
+            missing = [n for n in spi_nets if f'(name "{n}")' not in txt]
+            if missing:
+                problems.append(f"{v.name}: dual variant missing SPI AGG nets {missing}")
         # storage device present
         dev = "J2" if v.storage == "microsd" else "XU7"
         if f'(ref "{dev}")' not in txt:

@@ -21,24 +21,28 @@
 | (DAT4..DAT7) | optional 8-bit eMMC | free GPIOs | only if bridge + layout support 8-bit; raises wired throughput |
 
 
-## I2C (fuel gauge U4)
+## I2C (fuel gauge U4 + charger U3)
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
-| I2C_SDA | I2C data | free GPIO | 4.7k pull-up |
-| I2C_SCL | I2C clock | free GPIO | 4.7k pull-up |
+| I2C_SDA | I2C data | free GPIO | 4.7k pull-up; shared with BQ25896 SDA |
+| I2C_SCL | I2C clock | free GPIO | 4.7k pull-up; shared with BQ25896 SCL |
 | GAUGE_ALRT | low-battery interrupt | free GPIO | from MAX17048 ALRT (open-drain) |
+| CHG_INT | charger interrupt | free GPIO | from BQ25896 INT (open-drain) |
 
 ## UI + charger status
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
 | BTN | tactile button | free GPIO | 10k pull-up + firmware debounce; press patterns = pair / factory-reset |
 | LED_DIN | WS2812 data | free GPIO | single addressable RGB |
-| CHG_STAT | charger status | free GPIO | from MCP73831 STAT (open-drain) |
+| CHG_STAT | charger status | free GPIO | from BQ25896 STAT (open-drain) |
 
 ## Second radio (U1B) + aggregation link (Dual Radio only)
 | Signal | Role | Pin (U1 / U1B) | Notes |
 |---|---|---|---|
-| AGG_TX / AGG_RX | radio<->radio coordination | free UART pair | U1.AGG_TX -> U1B.AGG_RX and vice-versa |
+| AGG_CLK | SPI clock | free GPIO | U1.AGG_CLK -> U1B.AGG_CLK |
+| AGG_CS | SPI chip select | free GPIO | U1.AGG_CS -> U1B.AGG_CS |
+| AGG_MOSI | SPI data out | free GPIO | U1.AGG_MOSI -> U1B.AGG_MOSI |
+| AGG_MISO | SPI data in | free GPIO | U1.AGG_MISO <- U1B.AGG_MISO |
 | 3V3 / GND / EN | power U1B | — | U5 must be sized for two radios' peak |
 
 ## Routing note

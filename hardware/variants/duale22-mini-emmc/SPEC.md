@@ -14,6 +14,7 @@ Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
 **Status:** Roadmap item. Utilizes projected `ESP32-E22-MINI-1` module.
 
 **Note:** Dual-radio link aggregation is experimental. Validate RF isolation between antennas.
+**AGG Link:** SPI (CLK, CS, MOSI, MISO) for higher sustained throughput (~12-15 MB/s).
 
 ## Storage — eMMC (sealed, per-SKU capacity)
 153-ball TFBGA eMMC 5.1, 11.5 x 13.0 x 1.2 mm. Capacity is fixed at manufacture.
@@ -30,7 +31,8 @@ Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
 
 ## Performance
 - Everyday wireless: **~300 MB/s**.
-- Bulk wired (USB-HS bridge): **~20-40 MB/s**.
+- Bulk wired (GL3224 USB 3.0 bridge): **~70-100+ MB/s**.
+- Bulk wired (GL823 USB 2.0 bridge): **~25-35 MB/s**.
 
 ## Dimensions
 Enclosure envelope: **32 x 24 x 8 mm** (AirTag-class).
@@ -44,6 +46,8 @@ Enclosure envelope: **32 x 24 x 8 mm** (AirTag-class).
 
 ## Bring-up checklist
 - [ ] Reconcile signal->GPIO from the datasheet (PIN_MAP).
+- [ ] Verify GL3224-OEM pin mapping from its datasheet (logical placeholders used).
+- [ ] Verify BQ25896 pin mapping from its datasheet (logical placeholders used).
 - [ ] Confirm USB-HS bridge part number + handoff mode.
 - [ ] Validate SDIO timing.
 - [ ] Measure real TX current; size BT1 cell.
