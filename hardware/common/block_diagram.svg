@@ -22,7 +22,7 @@
   <!-- Charger -->
   <g filter="url(#s2)"><rect x="40" y="210" width="130" height="60" rx="12" fill="#fff"/></g>
   <text x="105" y="236" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">Charger (U3)</text>
-  <text x="105" y="255" text-anchor="middle" font-size="11" fill="#6f5b4c">MCP73831</text>
+  <text x="105" y="255" text-anchor="middle" font-size="11" fill="#6f5b4c">BQ25896 · I²C · PP</text>
 
   <!-- Battery + gauge -->
   <g filter="url(#s2)"><rect x="40" y="306" width="130" height="60" rx="12" fill="#fff"/></g>
@@ -39,7 +39,7 @@
   <text x="430" y="140" text-anchor="middle" font-size="15" font-weight="bold" fill="#3a2c23">ESP32-C5 (U1)</text>
   <text x="430" y="162" text-anchor="middle" font-size="11" fill="#6f5b4c">BLE control + WiFi 5GHz/Aware</text>
   <text x="430" y="180" text-anchor="middle" font-size="11" fill="#6f5b4c">SDIO master · I2C · GPIO</text>
-  <text x="430" y="198" text-anchor="middle" font-size="10.5" fill="#b5654f" font-style="italic">DualC5: +U1b + agg link</text>
+  <text x="430" y="198" text-anchor="middle" font-size="10.5" fill="#b5654f" font-style="italic">DualC5: +U1b + SPI AGG link</text>
 
   <!-- Arbiter -->
   <g filter="url(#s2)"><rect x="360" y="262" width="140" height="60" rx="12" fill="#fff"/></g>
@@ -54,8 +54,8 @@
 
   <!-- Bridge -->
   <g filter="url(#s2)"><rect x="690" y="262" width="170" height="60" rx="12" fill="#fff"/></g>
-  <text x="775" y="286" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">USB-HS bridge (U2)</text>
-  <text x="775" y="305" text-anchor="middle" font-size="11" fill="#6f5b4c">~20–40 MB/s wired</text>
+  <text x="775" y="286" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">GL3224 Bridge (U2)</text>
+  <text x="775" y="305" text-anchor="middle" font-size="11" fill="#6f5b4c">~70–100+ MB/s wired</text>
 
   <!-- UI -->
   <g filter="url(#s2)"><rect x="690" y="110" width="170" height="96" rx="14" fill="#fff"/></g>
@@ -82,5 +82,5 @@
   </g>
   <text x="250" y="500" font-size="11" fill="#7d9b86">— power</text>
   <text x="330" y="500" font-size="11" fill="#7a5a48">— data / control</text>
-  <text x="40" y="528" font-size="11.5" fill="#8a7464" font-style="italic">Wired fast path = USB-C → bridge → storage (bypasses the radio). Wireless path = phone ⟷ C5 (BLE+WiFi) ⟷ storage. Never both at once.</text>
+  <text x="40" y="528" font-size="11.5" fill="#8a7464" font-style="italic">Wired fast path = USB-C → GL3224 bridge → storage (bypasses the radio). Wireless path = phone ⟷ C5 (BLE+WiFi) ⟷ storage. Never both at once.</text>
 </svg>

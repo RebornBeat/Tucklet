@@ -46,9 +46,9 @@ Full detail in [`docs/UX_SPEC.md`](docs/UX_SPEC.md).
 ```
 tucklet/
 ├── README.md                  # you are here
-├── LICENSING.md               # which license covers what (source-available, non-commercial for Charm; Pro is separate)
-├── LICENSE-HARDWARE.txt        # CC BY-NC-SA 4.0 (hardware/mechanical — Charm variants only)
-├── LICENSE-SOFTWARE.txt        # PolyForm Noncommercial 1.0.0 (firmware/apps — Charm variants only)
+├── LICENSING.md               # which license covers what (source-available, non-commercial for both Charm and Pro lines)
+├── LICENSE-HARDWARE.txt        # CC BY-NC-SA 4.0 (hardware/mechanical — both Charm and Pro variants)
+├── LICENSE-SOFTWARE.txt        # PolyForm Noncommercial 1.0.0 (firmware/apps — both Charm and Pro variants)
 ├── docs/
 │   ├── INDEX.md               # documentation map — start here to navigate
 │   ├── FINAL_REVIEW.md        # current source of truth (supersedes ADRs)
@@ -59,7 +59,7 @@ tucklet/
 │   └── assets/flow.svg
 ├── hardware/
 │   ├── README.md              # hardware overview + how the variants relate
-│   ├── PRO_LINE.md            # Pro line (E22-WROOM + 2S) — commercial, not under NC license
+│   ├── PRO_LINE.md            # Pro line (E22-WROOM + 2S) — source-available, non-commercial
 │   ├── gen_hardware.py        # parametric SOURCE — regenerates every variant
 │   ├── common/                # shared parts rationale, cross-variant comparison, block diagram
 │   └── variants/              # one folder per board: SPEC, BOM, PIN_MAP, SCHEMATIC_PLAN, .net, diagram
@@ -110,7 +110,7 @@ current state of each.
 
 ## The two product lines
 
-Tucklet is organized as two distinct product lines with separate licensing:
+Tucklet is organized as two distinct product lines, both under the same source-available, non-commercial licensing:
 
 ### Charm (source-available, non-commercial)
 
@@ -127,15 +127,11 @@ Key components in the Charm line:
 - **Dual-Radio AGG Link:** SPI (4 wires: CLK, CS, MOSI, MISO) for 12–15 MB/s sustained on dual variants.
 - **Battery:** 1S LiPo (120–200 mAh for C5; 300–500 mAh for E22).
 
-### Pro (commercial, not under the NC license)
+### Pro (source-available, non-commercial)
 
 A larger, higher-performance variant built around the **ESP32-E22-WROOM** (Wi-Fi 6E,
 22×30 mm module with external IPEX antenna) and a **2S LiPo** battery pack.
-This requires a larger enclosure (~35×28×12–13 mm) and is not part of the
-source-available, non-commercial license grant. The Pro design IP is documented
-in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md) for provenance and future
-commercial use, but it is **explicitly excluded** from the CC BY-NC-SA /
-PolyForm NC grant.
+This requires a larger enclosure (~35×28×12–13 mm) and, like the Charm line, is fully covered under the **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software) licenses. The Pro design IP is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md) and is available for study, modification, and personal use; commercial sale requires a separate agreement.
 
 Key differences for Pro:
 - **Charger:** BQ25887 (2S boost + cell balancing).
@@ -146,19 +142,13 @@ Key differences for Pro:
 
 ## License
 
-Dual, **source-available, non-commercial** for the **Charm** line (study/modify/build, don't sell):
-hardware under CC BY-NC-SA 4.0, software under PolyForm Noncommercial 1.0.0. This
-is *not* an OSI/GNU "open source" license — see [`LICENSING.md`](LICENSING.md).
-
-The **Pro** line (E22-WROOM + 2S battery) is documented in this repository for
-design provenance but is **not licensed** under the above terms. Commercial use
-of the Pro design requires a separate agreement with the project maintainer.
+**Source-available, non-commercial** for both the **Charm** and **Pro** lines (study/modify/build, don't sell): hardware under CC BY-NC-SA 4.0, software under PolyForm Noncommercial 1.0.0. This is *not* an OSI/GNU "open source" license — see [`LICENSING.md`](LICENSING.md).
 
 ### Hardware scope & novelty
 
 The Hardware License (CC BY-NC-SA 4.0) applies to the specific implementation files
 (schematics, PCB layouts, netlists, and mechanical models) contained in this
-repository for the **Charm** product line. Specifically, the license covers the
+repository for **both the Charm and Pro product lines**. Specifically, the license covers the
 following novel design elements:
 
 1. **SDIO Bus Multiplexing Architecture:** The specific circuit topology where the
@@ -171,13 +161,6 @@ following novel design elements:
    throughput.
 3. **Integrated Charm Enclosure:** The parametric mechanical design that integrates
    a battery, antenna, storage, and thermal management into an AirTag-class envelope.
-
-**Note on Patents:** This license covers the *artistic and functional design files*
-(Copyright). It prevents others from copying your PCB layouts or manufacturing
-your exact design commercially. It does not prevent others from independently
-inventing similar circuits (which would require a Patent). However, by publishing
-these designs under a Non-Commercial license, you ensure that no one can legally
-clone the *Tucklet hardware* for sale without your permission.
 
 ---
 
