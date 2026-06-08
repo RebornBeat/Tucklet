@@ -54,6 +54,21 @@ High-performance variants dependent on the future release of an ESP32-E22-MINI-1
 
 *(Note: microSD and eMMC each span the capacity sub-axis; eMMC capacities and BOM are in `hardware/common/VARIANTS.md`.)*
 
+## The Product Lines
+
+Tucklet is organized as two distinct product lines, both under the same source-available, non-commercial licensing:
+
+| Line | Radio | Form Factor | Variants | Position |
+|---|---|---|---|---|
+| **Charm Standard** | ESP32-C5 | WROOM | 4 | Baseline: Lowest cost, easy assembly |
+| **Charm Compact** | ESP32-C5 | MINI | 4 | Nano: Smallest footprint, tighter layout |
+| **Charm High-Perf** | ESP32-E22 | MINI | 4 | Roadmap: Wi-Fi 6E speed, pending module release |
+| **Pro High-Perf** | ESP32-E22 | WROOM | Roadmap | Larger: Wi-Fi 6E speed, 2S battery, pending module release |
+
+All lines are licensed under **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software). The Pro line is a **Charm** — it fits a "charm" envelope (wearable, on-phone), even though it is thicker to accommodate the 2S battery. It is not a "backpack" or "brick" class device. You may study, modify, and build for personal use; commercial sale requires a separate agreement.
+
+**Note:** The ESP32-E22 variants (both MINI and WROOM) are **Roadmap** items. The `ESP32-E22-MINI-1` module is projected but not yet released. The `ESP32-E22-WROOM` module (22×30 mm, external IPEX antenna) is the basis for the Pro line. **No E22 variant folders are created at this time** (see "Variant Folder Organization" below).
+
 ## How firmware handles the matrix
 
 Compile-time Cargo features select the hardware reality; everything else is runtime:
@@ -80,6 +95,9 @@ storage_emmc    = []
 transport_softap = []        # always on
 transport_wifi_aware = []    # optional
 transport_wired_usbhs = []   # optional (the bridge IC is populated)
+
+# AGG Link
+agg_spi = []                 # dual variants use SPI; single doesn't need it
 ```
 
 At boot the firmware assembles a `DeviceCapabilities` from its enabled features and advertises it. `tucklet-core::variant::usable_transports()` (unit-tested) then narrows that to what the connected client can use.
@@ -100,3 +118,34 @@ So a user with a microSD SingleC5 Mini and a user with a DualC5 eMMC Standard ru
 2. App reads `DeviceCapabilities` + `StatusReport`.
 3. App resolves transport + link profile for the current platform and physical state (plugged in or not).
 4. App shows accurate ETAs and storage states before any bytes move.
+
+## Storage axis
+
+### microSD (swappable)
+Push-push socket, SDIO 4-bit, +~$0.40. Customer supplies/upgrades the card; you don't pay for flash. Dead card = $5 swap, not a dead device. Slightly larger enclosure (socket + insertion clearance), placed internally behind a small door so the unit still looks sealed.
+
+### eMMC (sealed) — per-capacity cost (small-volume estimate; VERIFY)
+153-ball TFBGA eMMC 5.1, 11.5 × 13.0 × 1.2 mm. Capacity is fixed at manufacture.
+
+| Capacity | eMMC est. | Full BOM (single-C5) |
+|---|---|---|
+| 8 GB | ~$2.50 | ~$13.5 |
+| 16 GB | ~$3.50 | ~$14.5 |
+| 32 GB | ~$5.00 | ~$16.0 |
+| 64 GB | ~$8.00 | ~$19.0 |
+| 128 GB | ~$13.00 | ~$24.0 |
+| 256 GB | ~$22.00 | ~$33.0 |
+
+Only 8–16 GB eMMC stays near the sub-$15 target — the honest cost of integrated flash, and exactly why offering microSD *and* eMMC is smart. Requires BGA assembly (CM with reflow + ideally X-ray).
+
+## Radio axis
+
+Performance and Power vary significantly between the C5 and E22 generations.
+
+| Radio | Real wireless | Module size | Fits charm? | Notes |
+|---|---|---|---|---|
+| 1× ESP32-C5 | ~6–9 MB/s (5 GHz Wi-Fi 6) | WROOM: ~18 × 27.5 mm / MINI: ~15.4 × 21.3 mm | yes | **Recommended baseline.** Best balance of power/performance. |
+| 2× ESP32-C5 | ~12–15 MB/s (SPI AGG) | 2 modules + 2 antennas | tight | **Experimental.** Validate RF isolation before production. SPI link prevents inter-chip bottleneck. |
+| 1× ESP32-E22 | ~20–40+ MB/s (Wi-Fi 6E) | MINI: ~15 × 21 mm (projected) | yes (warm) | **High Performance.** Tri-band (2.4/5/6 GHz). Requires >2A buck & larger battery. **MINI form factor only. Roadmap.** |
+| 2× ESP32-E22 | ~40–70+ MB/s (SPI AGG) | MINI: 2 modules | tight (hot) | **Extreme Performance.** Significant thermal considerations. **MINI form factor only. Roadmap.** |
+| 1× ESP32-E22 (Pro) | ~20–40+ MB/s (Wi-Fi 6E) | WROOM: 22 × 30 mm | yes (Pro envelope) | **Pro Charm.** External IPEX antenna. 2S battery. ~35

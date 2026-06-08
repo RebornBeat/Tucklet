@@ -94,7 +94,7 @@
     <g filter="url(#soft)"><rect x="474" y="372" width="400" height="132" rx="14" fill="#fff"/></g>
     <rect x="474" y="372" width="8" height="132" rx="4" fill="#9a7a66"/>
     <text x="494" y="398" font-size="14" fill="#3a2c23" font-weight="bold">USB-C bridge — plug in for bulk</text>
-    <text x="494" y="418" font-size="12" fill="#6f5b4c">~20-40 MB/s. A whole library in minutes.</text>
+    <text x="494" y="418" font-size="12" fill="#6f5b4c">~70–100+ MB/s (GL3224 USB 3.0). A whole library in minutes.</text>
     <text x="494" y="444" font-size="12" fill="#6f5b4c">Also charges the charm and shows up as a</text>
     <text x="494" y="461" font-size="12" fill="#6f5b4c">normal fast drive on a computer.</text>
     <text x="494" y="487" font-size="11.5" fill="#8a7464" font-style="italic">microSD or eMMC inside · C5 or dual-C5 radio</text>

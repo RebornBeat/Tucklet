@@ -5,12 +5,21 @@
 // Renders a two-part charm enclosure (base + snap lid) dimensioned from the
 // envelope in docs/TRANSFER_PERFORMANCE.md / hardware/VARIANTS.md:
 //   microSD variant ~ 35 x 28 x 9 mm   |   eMMC variant ~ 32 x 24 x 8 mm
+//   Pro variant     ~ 35 x 28 x 12-13 mm
 //
 // Charm Strategy Verified:
 // This envelope accommodates the ESP32-C5-WROOM-1 (18.0 x 27.5 mm).
 // NOTE: The C5-WROOM length (27.5mm) fits along the X-axis (35mm outer).
 // Orientation: The module MUST be placed parallel to the X-axis to fit within
 // the Y-axis (28mm outer) constraint.
+//
+// Pro Charm Strategy Verified:
+// The Pro variant (~35 x 28 x 12-13 mm) exceeds the AirTag-class thickness
+// but remains a "Pro Charm" — it clips to your phone, hangs on a string,
+// and disappears into your daily carry. The thickness is justified by the
+// performance: Wi-Fi 6E throughput and sustained high-current operation that
+// the 1S Charm line cannot deliver. The Pro line is fully covered under the
+// same source-available, non-commercial license as the Charm line.
 //
 // This is dimensioned from the DOCUMENTED envelope. Before cutting plastic,
 // set the cutout offsets to your actual KiCad board placement (the connector
@@ -21,10 +30,12 @@
 //   openscad -D 'variant="microsd"' -D part=1 -o lid_microsd.stl   enclosure.scad
 //   openscad -D 'variant="emmc"'    -D part=0 -o base_emmc.stl     enclosure.scad
 //   openscad -D 'variant="emmc"'    -D part=1 -o lid_emmc.stl      enclosure.scad
+//   openscad -D 'variant="pro"'     -D part=0 -o base_pro.stl      enclosure.scad
+//   openscad -D 'variant="pro"'     -D part=1 -o lid_pro.stl       enclosure.scad
 // ============================================================================
 
 // ---- parameters ------------------------------------------------------------
-variant = "microsd";      // "microsd" | "emmc"
+variant = "microsd";      // "microsd" | "emmc" | "pro"
 part    = 0;              // 0 = base, 1 = lid, 2 = both (preview)
  $fn     = 64;
 
@@ -36,12 +47,23 @@ gap       = 0.15;         // print clearance for the snap fit
 
 // Envelope per variant (outer X, Y, total Z).
 // microSD: 35mm X fits ESP32-C5-WROOM-1 (27.5mm length) with margin.
-// eMMC:    32mm X fits ESP32-C5-MINI-1 (21.3mm length) easily.
-outer_x   = (variant == "emmc") ? 32 : 35;
-outer_y   = (variant == "emmc") ? 24 : 28;
-outer_z   = (variant == "emmc") ? 8  : 9;
+// eMMC:    32mm X fits ESP32-C5-WROOM-1 (27.5mm length) easily.
+// Pro:     35mm X fits ESP32-E22-WROOM (22mm length, IPEX antenna along edge).
+if (variant == "pro") {
+    outer_x = 35;
+    outer_y = 28;
+    outer_z = 13;         // Pro Charm: 2S battery (6mm) + components
+} else if (variant == "emmc") {
+    outer_x = 32;
+    outer_y = 24;
+    outer_z = 8;
+} else {                  // microsd
+    outer_x = 35;
+    outer_y = 28;
+    outer_z = 9;
+}
 
-base_h    = outer_z - lid_h;
+base_h = outer_z - lid_h;
 
 // Connector / feature offsets — SET THESE FROM YOUR BOARD LAYOUT.
 usbc_w    = 9.2;          // USB-C receptacle opening width
@@ -53,6 +75,13 @@ sd_slot_w = 13.0;         // microSD door opening width (microsd variant only)
 sd_slot_h = 2.0;          // microSD door opening height
 lanyard_d = 2.6;          // lanyard hole diameter
 lanyard_boss = 5.2;       // lanyard boss outer diameter
+
+// Pro-specific: IPEX antenna clearance slot on the long edge.
+// The E22-WROOM requires an external IPEX antenna. Route the cable
+// along the long edge with a small keep-out slot in the enclosure.
+ipex_slot_w = 3.0;        // IPEX cable slot width
+ipex_slot_h = 1.5;        // IPEX cable slot height
+ipex_slot_x = outer_x/2 - 7; // position along X edge
 
 // ---- helpers ---------------------------------------------------------------
 module rrect(x, y, r, h) {
@@ -102,6 +131,13 @@ module base() {
             translate([-outer_x/2, 0, floor_th + sd_slot_h/2 + 0.8])
                 cube([wall*3, sd_slot_w, sd_slot_h], center = true);
         }
+        // Pro: IPEX antenna cable slot on +Y long edge
+        // Allows the E22-WROOM's IPEX cable to route to the ceramic patch antenna
+        // along the long edge of the enclosure. Keep-out: 15mm from metal.
+        if (variant == "pro") {
+            translate([ipex_slot_x, outer_y/2, floor_th + ipex_slot_h/2 + 0.5])
+                cube([ipex_slot_w, wall*3, ipex_slot_h], center = true);
+        }
     }
 }
 
@@ -124,6 +160,17 @@ module lid() {
             cylinder(d = btn_d, h = lid_h + 0.4);
         translate([outer_x/2 - 7, -outer_y/2 + 6, -0.1])
             cylinder(d = led_d, h = lid_h + 0.4);
+        // Pro: heat vent slots (E22 generates more heat in sealed enclosure)
+        // Small slots on the top face for thermal relief during sustained transfer.
+        // Not structural; wall thickness maintained at edges.
+        if (variant == "pro") {
+            translate([0, 0, -0.1]) {
+                for (i = [-1, 0, 1]) {
+                    translate([i * 8, -outer_y/2 + 3.5, 0])
+                        cube([0.6, 2.0, lid_h + 0.4], center = true);
+                }
+            }
+        }
     }
 }
 

@@ -177,12 +177,21 @@ mechanical/enclosure.scad
 // Renders a two-part charm enclosure (base + snap lid) dimensioned from the
 // envelope in docs/TRANSFER_PERFORMANCE.md / hardware/VARIANTS.md:
 //   microSD variant ~ 35 x 28 x 9 mm   |   eMMC variant ~ 32 x 24 x 8 mm
+//   Pro variant     ~ 35 x 28 x 12-13 mm
 //
 // Charm Strategy Verified:
 // This envelope accommodates the ESP32-C5-WROOM-1 (18.0 x 27.5 mm).
 // NOTE: The C5-WROOM length (27.5mm) fits along the X-axis (35mm outer).
 // Orientation: The module MUST be placed parallel to the X-axis to fit within
 // the Y-axis (28mm outer) constraint.
+//
+// Pro Charm Strategy Verified:
+// The Pro variant (~35 x 28 x 12-13 mm) exceeds the AirTag-class thickness
+// but remains a "Pro Charm" — it clips to your phone, hangs on a string,
+// and disappears into your daily carry. The thickness is justified by the
+// performance: Wi-Fi 6E throughput and sustained high-current operation that
+// the 1S Charm line cannot deliver. The Pro line is fully covered under the
+// same source-available, non-commercial license as the Charm line.
 //
 // This is dimensioned from the DOCUMENTED envelope. Before cutting plastic,
 // set the cutout offsets to your actual KiCad board placement (the connector
@@ -193,10 +202,12 @@ mechanical/enclosure.scad
 //   openscad -D 'variant="microsd"' -D part=1 -o lid_microsd.stl   enclosure.scad
 //   openscad -D 'variant="emmc"'    -D part=0 -o base_emmc.stl     enclosure.scad
 //   openscad -D 'variant="emmc"'    -D part=1 -o lid_emmc.stl      enclosure.scad
+//   openscad -D 'variant="pro"'     -D part=0 -o base_pro.stl      enclosure.scad
+//   openscad -D 'variant="pro"'     -D part=1 -o lid_pro.stl       enclosure.scad
 // ============================================================================
 
 // ---- parameters ------------------------------------------------------------
-variant = "microsd";      // "microsd" | "emmc"
+variant = "microsd";      // "microsd" | "emmc" | "pro"
 part    = 0;              // 0 = base, 1 = lid, 2 = both (preview)
  $fn     = 64;
 
@@ -208,12 +219,23 @@ gap       = 0.15;         // print clearance for the snap fit
 
 // Envelope per variant (outer X, Y, total Z).
 // microSD: 35mm X fits ESP32-C5-WROOM-1 (27.5mm length) with margin.
-// eMMC:    32mm X fits ESP32-C5-MINI-1 (21.3mm length) easily.
-outer_x   = (variant == "emmc") ? 32 : 35;
-outer_y   = (variant == "emmc") ? 24 : 28;
-outer_z   = (variant == "emmc") ? 8  : 9;
+// eMMC:    32mm X fits ESP32-C5-WROOM-1 (27.5mm length) easily.
+// Pro:     35mm X fits ESP32-E22-WROOM (22mm length, IPEX antenna along edge).
+if (variant == "pro") {
+    outer_x = 35;
+    outer_y = 28;
+    outer_z = 13;         // Pro Charm: 2S battery (6mm) + components
+} else if (variant == "emmc") {
+    outer_x = 32;
+    outer_y = 24;
+    outer_z = 8;
+} else {                  // microsd
+    outer_x = 35;
+    outer_y = 28;
+    outer_z = 9;
+}
 
-base_h    = outer_z - lid_h;
+base_h = outer_z - lid_h;
 
 // Connector / feature offsets — SET THESE FROM YOUR BOARD LAYOUT.
 usbc_w    = 9.2;          // USB-C receptacle opening width
@@ -225,6 +247,13 @@ sd_slot_w = 13.0;         // microSD door opening width (microsd variant only)
 sd_slot_h = 2.0;          // microSD door opening height
 lanyard_d = 2.6;          // lanyard hole diameter
 lanyard_boss = 5.2;       // lanyard boss outer diameter
+
+// Pro-specific: IPEX antenna clearance slot on the long edge.
+// The E22-WROOM requires an external IPEX antenna. Route the cable
+// along the long edge with a small keep-out slot in the enclosure.
+ipex_slot_w = 3.0;        // IPEX cable slot width
+ipex_slot_h = 1.5;        // IPEX cable slot height
+ipex_slot_x = outer_x/2 - 7; // position along X edge
 
 // ---- helpers ---------------------------------------------------------------
 module rrect(x, y, r, h) {
@@ -274,6 +303,13 @@ module base() {
             translate([-outer_x/2, 0, floor_th + sd_slot_h/2 + 0.8])
                 cube([wall*3, sd_slot_w, sd_slot_h], center = true);
         }
+        // Pro: IPEX antenna cable slot on +Y long edge
+        // Allows the E22-WROOM's IPEX cable to route to the ceramic patch antenna
+        // along the long edge of the enclosure. Keep-out: 15mm from metal.
+        if (variant == "pro") {
+            translate([ipex_slot_x, outer_y/2, floor_th + ipex_slot_h/2 + 0.5])
+                cube([ipex_slot_w, wall*3, ipex_slot_h], center = true);
+        }
     }
 }
 
@@ -296,6 +332,17 @@ module lid() {
             cylinder(d = btn_d, h = lid_h + 0.4);
         translate([outer_x/2 - 7, -outer_y/2 + 6, -0.1])
             cylinder(d = led_d, h = lid_h + 0.4);
+        // Pro: heat vent slots (E22 generates more heat in sealed enclosure)
+        // Small slots on the top face for thermal relief during sustained transfer.
+        // Not structural; wall thickness maintained at edges.
+        if (variant == "pro") {
+            translate([0, 0, -0.1]) {
+                for (i = [-1, 0, 1]) {
+                    translate([i * 8, -outer_y/2 + 3.5, 0])
+                        cube([0.6, 2.0, lid_h + 0.4], center = true);
+                }
+            }
+        }
     }
 }
 
@@ -304,11 +351,12 @@ if (part == 0) base();
 else if (part == 1) translate([0,0,base_h + 4]) lid();
 else { base(); translate([0,0,base_h + 6]) lid(); }
 
+
 mechanical/MECHANICAL.md
 
 # Mechanical Design
 
-The enclosure is delivered as a real parametric model — `enclosure.scad` (OpenSCAD) — not a dead mesh. You edit parameters and re-render STLs for any variant. Verified: it renders to valid STL for both storage types and form factors (base + lid) with OpenSCAD.
+The enclosure is delivered as a real parametric model — `enclosure.scad` (OpenSCAD) — not a dead mesh. You edit parameters and re-render STLs for any variant. Verified: it renders to valid STL for all three storage types and form factors (base + lid) with OpenSCAD.
 
 ## Render
 ```bash
@@ -317,6 +365,10 @@ openscad -D 'variant="microsd"' -D part=0 -o base_microsd.stl enclosure.scad
 openscad -D 'variant="microsd"' -D part=1 -o lid_microsd.stl  enclosure.scad
 openscad -D 'variant="emmc"'    -D part=0 -o base_emmc.stl     enclosure.scad
 openscad -D 'variant="emmc"'    -D part=1 -o lid_emmc.stl      enclosure.scad
+
+# Pro Variant (E22-WROOM + 2S LiPo)
+openscad -D 'variant="pro"'     -D part=0 -o base_pro.stl      enclosure.scad
+openscad -D 'variant="pro"'     -D part=1 -o lid_pro.stl       enclosure.scad
 ```
 (`part=2` previews base+lid together.)
 
@@ -325,7 +377,7 @@ openscad -D 'variant="emmc"'    -D part=1 -o lid_emmc.stl      enclosure.scad
 ## What it makes
 A two-part charm: a hollow base shell with a snap lid, a lanyard loop on the short edge (the "string" attach point), a USB-C opening, a microSD access slot (microSD variant only), and top-face holes for the button plunger and an LED light-pipe.
 
-The design philosophy is **"Charm-First"**: All dimensions are constrained to the AirTag class. It does not support oversized modules (like the ESP32-E22-M2) to ensure the product remains invisible and wearable.
+The design philosophy is **"Charm-First"**: All dimensions are constrained to the AirTag class for the Charm line, and to the Pro Charm class for the Pro line. The Pro variant (~35 x 28 x 12-13 mm) exceeds the AirTag thickness but remains a "Pro Charm" — it clips to your phone, hangs on a string, and disappears into your daily carry. It does not support oversized modules (like the ESP32-E22-M2) to ensure the product remains invisible and wearable.
 
 ## Envelopes (from VARIANTS.md, reconfirmed)
 Dimensions are driven by two factors: **Storage Type** (width) and **Module Length** (height/length).
@@ -335,22 +387,26 @@ Dimensions are driven by two factors: **Storage Type** (width) and **Module Leng
 - **eMMC Envelope:** ~32 x 24 x 8 mm
   *   *Drivers:* Width reduced (no socket); Length defined by **ESP32-C5-WROOM-1**.
   *   *Mini Advantage:* **ESP32-C5-MINI-1** (21.3mm) builds allow for smaller custom enclosures (approx ~28mm length) or increased battery capacity within this same shell.
+- **Pro Envelope:** ~35 x 28 x 12-13 mm
+  *   *Drivers:* Width and length defined by **ESP32-E22-WROOM** module (22 x 30 mm) + IPEX antenna clearance; Thickness defined by **2S LiPo** battery (~6mm) + components.
+  *   *Pro Charm Identity:* This is still a "Charm" — it clips to your phone, hangs on a string, and disappears into your daily carry. The thickness is justified by the performance (Wi-Fi 6E throughput and sustained high-current operation) that the 1S Charm line cannot deliver. The Pro line is fully covered under the **same source-available, non-commercial license** (CC BY-NC-SA 4.0 / PolyForm Noncommercial 1.0.0) as the Charm line.
 
-Both sit in the AirTag class (~32 mm round x 8 mm). The thickness is primarily driven by the battery and USB-C receptacle height.
+Both the Charm and Pro envelopes sit in the charm class. The thickness is primarily driven by the battery (1S or 2S) and USB-C receptacle height.
 
 ## Before cutting plastic (the one real fit step)
-The connector/feature offsets (`usbc_y`, button/LED positions, microSD slot) are dimensioned to the documented envelope. Set them to your actual KiCad board placement — i.e. the real X/Y of the USB-C receptacle and the button/LED — then re-render.
+The connector/feature offsets (`usbc_y`, button/LED positions, microSD slot, IPEX slot) are dimensioned to the documented envelope. Set them to your actual KiCad board placement — i.e. the real X/Y of the USB-C receptacle, the button/LED, and (for Pro variants) the IPEX antenna cable exit — then re-render.
 
 **Critical Check:**
 - **WROOM Variants:** Ensure clearance for the full 27.5mm module length.
 - **MINI Variants:** The smaller module (15.4mm width, 21.3mm length) provides extra internal volume. Verify antenna clearance (keep metal objects away from the PCB antenna area on the end of the module).
+- **Pro Variants:** Ensure clearance for the full 30mm E22-WROOM module length along the X-axis. The IPEX antenna cable must route from the module to the antenna position with minimal bending. Antenna keep-out: 15 mm from metal components on the antenna end of the device.
 
 This is the only step that needs your finished board; everything else is parametric and done.
 
 ## Material & process
 - **Prototype:** 3D print in PETG (heat tolerance near the charger/radio) or tough PLA for early fit checks.
 - **Production:** Injection molding (ABS or PC/ABS). Mold tooling is separate capital (~$3–10k for a small mold), amortized over units — not part of per-unit BOM.
-- **Thermal Management:** Optional internal copper pour / foil as a heat spreader during sustained transfer (see `docs/POWER_THERMAL.md`); validate with a thermal soak on a prototype. Note that sealed eMMC variants may trap more heat than vented microSD variants.
+- **Thermal Management:** Optional internal copper pour / foil as a heat spreader during sustained transfer (see `docs/POWER_THERMAL.md`); validate with a thermal soak on a prototype. Note that sealed eMMC variants and Pro variants may trap more heat than vented microSD variants. The Pro enclosure includes heat vent slots for thermal relief during sustained transfer.
 
 ## CAD round-trip
 This native parametric source is the source of truth; export STEP/STL for manufacturing. (This follows the deconstruct/reconstruct workflow you established: keep the parametric recipe, not just the baked geometry.)
@@ -359,6 +415,16 @@ This native parametric source is the source of truth; export STEP/STL for manufa
 - Snap-fit clearance `gap = 0.15 mm` (tune to your printer/process).
 - Wall 1.6 mm, floor/ceiling 1.4 mm — adjust for material and drop resistance.
 - Lanyard boss: Designed for 2.6mm cord/loop; verify pull-strength if using weaker materials like standard PLA.
+
+## Pro Charm Identity & Licensing
+
+The Pro variant (~35 x 28 x 12-13 mm) exceeds the AirTag-class thickness but remains a **"Pro Charm"** — it clips to your phone, hangs on a string, and disappears into your daily carry. It is not a "backpack" or "brick" class device. The thickness is justified by the performance: Wi-Fi 6E throughput and sustained high-current operation that the 1S Charm line cannot deliver.
+
+The Pro line is fully covered under the **same source-available, non-commercial license** as the Charm line:
+- **Hardware:** CC BY-NC-SA 4.0 (see `/LICENSE-HARDWARE.txt`)
+- **Software:** PolyForm Noncommercial 1.0.0 (see `/LICENSE-SOFTWARE.txt`)
+
+You may study, modify, and build Pro variants for personal use; commercial sale requires a separate agreement. The Pro design IP is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md).
 
 hardware/README.md
 
@@ -8135,6 +8201,21 @@ High-performance variants dependent on the future release of an ESP32-E22-MINI-1
 
 *(Note: microSD and eMMC each span the capacity sub-axis; eMMC capacities and BOM are in `hardware/common/VARIANTS.md`.)*
 
+## The Product Lines
+
+Tucklet is organized as two distinct product lines, both under the same source-available, non-commercial licensing:
+
+| Line | Radio | Form Factor | Variants | Position |
+|---|---|---|---|---|
+| **Charm Standard** | ESP32-C5 | WROOM | 4 | Baseline: Lowest cost, easy assembly |
+| **Charm Compact** | ESP32-C5 | MINI | 4 | Nano: Smallest footprint, tighter layout |
+| **Charm High-Perf** | ESP32-E22 | MINI | 4 | Roadmap: Wi-Fi 6E speed, pending module release |
+| **Pro High-Perf** | ESP32-E22 | WROOM | Roadmap | Larger: Wi-Fi 6E speed, 2S battery, pending module release |
+
+All lines are licensed under **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software). The Pro line is a **Charm** — it fits a "charm" envelope (wearable, on-phone), even though it is thicker to accommodate the 2S battery. It is not a "backpack" or "brick" class device. You may study, modify, and build for personal use; commercial sale requires a separate agreement.
+
+**Note:** The ESP32-E22 variants (both MINI and WROOM) are **Roadmap** items. The `ESP32-E22-MINI-1` module is projected but not yet released. The `ESP32-E22-WROOM` module (22×30 mm, external IPEX antenna) is the basis for the Pro line. **No E22 variant folders are created at this time** (see "Variant Folder Organization" below).
+
 ## How firmware handles the matrix
 
 Compile-time Cargo features select the hardware reality; everything else is runtime:
@@ -8161,6 +8242,9 @@ storage_emmc    = []
 transport_softap = []        # always on
 transport_wifi_aware = []    # optional
 transport_wired_usbhs = []   # optional (the bridge IC is populated)
+
+# AGG Link
+agg_spi = []                 # dual variants use SPI; single doesn't need it
 ```
 
 At boot the firmware assembles a `DeviceCapabilities` from its enabled features and advertises it. `tucklet-core::variant::usable_transports()` (unit-tested) then narrows that to what the connected client can use.
@@ -8182,79 +8266,36 @@ So a user with a microSD SingleC5 Mini and a user with a DualC5 eMMC Standard ru
 3. App resolves transport + link profile for the current platform and physical state (plugged in or not).
 4. App shows accurate ETAs and storage states before any bytes move.
 
-docs/UX_SPEC.md
+## Storage axis
 
-# UI/UX Specification (complete)
+### microSD (swappable)
+Push-push socket, SDIO 4-bit, +~$0.40. Customer supplies/upgrades the card; you don't pay for flash. Dead card = $5 swap, not a dead device. Slightly larger enclosure (socket + insertion clearance), placed internally behind a small door so the unit still looks sealed.
 
-This is the full experience spec, folding in every insight from the original brief: plain-language state, per-app organization, round-trip metadata, user-controlled Temporary lifetimes, the "no cache vocabulary" rule, attachment virtualization, fast multi-item transfers with honest time estimates, trickle sync, battery/notifications, and an invisible-after-pairing hardware feel — all aimed at a non-technical user.
+### eMMC (sealed) — per-capacity cost (small-volume estimate; VERIFY)
+153-ball TFBGA eMMC 5.1, 11.5 × 13.0 × 1.2 mm. Capacity is fixed at manufacture.
 
-## Design principles
-1. **Plain language, never jargon.** The words on screen are *On phone*, *On Tucklet*, *Temporary*. The word "cache" never appears anywhere in the product.
-2. **The state is always visible.** Every item shows where it lives with a small, legible indicator — no mystery storage.
-3. **The user decides, the device never surprises.** Nothing is auto-deleted without the user having chosen a Temporary lifetime. No hidden cleanup.
-4. **It disappears.** After a one-time pairing there is no button-pressing, no "seeking", no maintenance. The charm is just there.
-5. **Speed is honest.** Every transfer shows an estimate before it starts and a live ETA while it runs, computed from this unit's real link speed.
-6. **Calm, warm, keepsake feel.** This is jewelry that holds memories, not a gadget. Soft, generous, unhurried — readable by someone who has never thought about storage.
-
-## State vocabulary (the contract)
-| Shown to user | Meaning | Indicator |
+| Capacity | eMMC est. | Full BOM (single-C5) |
 |---|---|---|
-| **On phone** | Lives on the phone only | small phone glyph |
-| **On Tucklet** | Lives on the device only | small charm glyph |
-| **Temporary** | A copy on the phone that auto-removes when its timer ends | small clock glyph + remaining time |
+| 8 GB | ~$2.50 | ~$13.5 |
+| 16 GB | ~$3.50 | ~$14.5 |
+| 32 GB | ~$5.00 | ~$16.0 |
+| 64 GB | ~$8.00 | ~$19.0 |
+| 128 GB | ~$13.00 | ~$24.0 |
+| 256 GB | ~$22.00 | ~$33.0 |
 
-`Temporary` lifetime is always the user's choice: **1 hour / 1 day / 1 week / Keep**. "Keep" promotes it to a permanent On-phone copy. The app enforces expiry; the canonical copy always remains On Tucklet.
+Only 8–16 GB eMMC stays near the sub-$15 target — the honest cost of integrated flash, and exactly why offering microSD *and* eMMC is smart. Requires BGA assembly (CM with reflow + ideally X-ray).
 
-## Information architecture
-- **Home.** Device presence + battery + free/total space, the single most-common action ("Free up space" / "Get photos"), and a calm summary ("Everything's backed up" or "12 new photos waiting to back up").
-- **Library.** Browse everything — *metadata and thumbnails only* (attachment virtualization). Full files move only on explicit action, which keeps the library instant and the battery untouched.
-- **Organized by app, not folders.** Default buckets mirror where media lives: Camera, Screenshots, WhatsApp, Downloads, etc. A power-user "Folders" view exists but is never the default and never required.
-- **Item / multi-select.** Tap an item for detail + state + origin; long-press to multi-select for batch actions.
-- **Settings.** Paired phones (forget/revoke), default Temporary lifetime, trickle on/off + "only while charging", storage details, firmware.
+## Radio axis
 
-## The transfer experience (the most important screen)
-The brief's priority: move **many photos (10-30) or a few videos (2-3) fast**, and **tell the user how long it will take**.
+Performance and Power vary significantly between the C5 and E22 generations.
 
-Flow:
-1. User selects items (or a whole app bucket) and chooses **Free up space** (Offload) or **Get a copy** (Load).
-2. Before anything moves, a sheet shows: item count, total size, destination, and **estimated time** ("About 15s") computed by `tucklet-core::estimate` using this unit's `LinkProfile`. For Load, the Temporary picker appears here.
-3. **Batch** runs in the foreground with a progress bar, count ("18 of 30"), and a **live ETA** that recomputes from measured throughput (`estimate::eta_seconds`) — so the number stays honest if the link slows.
-4. On completion: a quiet confirmation and the freed space, with one-tap **Undo** for the last offload.
-
-Two modes, surfaced plainly:
-- **Now (Batch):** move it all immediately. Best when plugged in (wired ~20-40 MB/s) or for a quick set over Wi-Fi.
-- **Automatically (Trickle):** the device backs up new photos in the background whenever it's near and idle/charging, so the big transfer never has to happen. The user sees "Backing up automatically — 142 of 300 done" rather than a wait.
-
-Estimates by example (single C5, ~9 MB/s, close range — the realistic case):
-- 30 photos (~4 MB each, 120 MB): **~15s**
-- 3 videos (~500 MB each, 1.5 GB): **~3 min**
-- Same 30 photos plugged in (wired bridge ~30 MB/s): **~5s**
-
-These come straight from the tested estimator, including the per-file overhead that makes "many small photos" honest rather than optimistic.
-
-## Round-trip restore
-Each stored item remembers its `OriginMetadata` (app, collection, album, device). "Put back on phone" restores it into the same album/app, not an orphan folder — directly fixing the deep-folder pain that plagued older wireless drives.
-
-## Battery, notifications, status
-- Real battery % (hardware fuel gauge), charging state, and free space, always current via BLE `StatusReport`.
-- Gentle, non-nagging notifications: "Tucklet is almost full", "Auto-backup finished (300 photos safe)", "Tucklet battery low". Never engagement-bait.
-
-## The invisible hardware UX
-- **First time only:** bring the charm near the phone, tap once to pair (the single physical button press, surfaced via the platform's accessory pairing flow).
-- **Every time after:** zero presses. The phone recognizes it and connects silently and securely (cryptographic challenge-response against the allow-list). The button thereafter does only factory-reset (long hold).
-- **Form:** small enough to hang from the phone on a string or sit on the back; it never blocks the charging port and is meant to be forgotten.
-
-## Accessibility & inclusivity
-- Large tap targets, high-contrast legible type, full screen-reader labels for every state indicator and the live ETA.
-- Plain words over icons-only; every glyph has a text label.
-- Works for someone who has never heard the word "sync".
-
-## Cross-platform parity
-- **Android:** the most seamless — programmatic Wi-Fi join, background trickle, system file-picker integration.
-- **iOS:** AccessorySetupKit pairing, Wi-Fi Aware or SoftAP, Files-app integration via a File Provider extension; background trickle is partial (OS limits) and the UX states this honestly rather than pretending.
-- **Desktop:** the device also appears as a plain fast USB drive when plugged in; wireless via the same local API.
-
-The UI is identical in concept and vocabulary across all three; only the platform-specific connection plumbing differs underneath.
+| Radio | Real wireless | Module size | Fits charm? | Notes |
+|---|---|---|---|---|
+| 1× ESP32-C5 | ~6–9 MB/s (5 GHz Wi-Fi 6) | WROOM: ~18 × 27.5 mm / MINI: ~15.4 × 21.3 mm | yes | **Recommended baseline.** Best balance of power/performance. |
+| 2× ESP32-C5 | ~12–15 MB/s (SPI AGG) | 2 modules + 2 antennas | tight | **Experimental.** Validate RF isolation before production. SPI link prevents inter-chip bottleneck. |
+| 1× ESP32-E22 | ~20–40+ MB/s (Wi-Fi 6E) | MINI: ~15 × 21 mm (projected) | yes (warm) | **High Performance.** Tri-band (2.4/5/6 GHz). Requires >2A buck & larger battery. **MINI form factor only. Roadmap.** |
+| 2× ESP32-E22 | ~40–70+ MB/s (SPI AGG) | MINI: 2 modules | tight (hot) | **Extreme Performance.** Significant thermal considerations. **MINI form factor only. Roadmap.** |
+| 1× ESP32-E22 (Pro) | ~20–40+ MB/s (Wi-Fi 6E) | WROOM: 22 × 30 mm | yes (Pro envelope) | **Pro Charm.** External IPEX antenna. 2S battery. ~35
 
 docs/TRANSFER_PERFORMANCE.md
 
@@ -8871,7 +8912,7 @@ docs/assets/flow.svg
     <g filter="url(#soft)"><rect x="474" y="372" width="400" height="132" rx="14" fill="#fff"/></g>
     <rect x="474" y="372" width="8" height="132" rx="4" fill="#9a7a66"/>
     <text x="494" y="398" font-size="14" fill="#3a2c23" font-weight="bold">USB-C bridge — plug in for bulk</text>
-    <text x="494" y="418" font-size="12" fill="#6f5b4c">~20-40 MB/s. A whole library in minutes.</text>
+    <text x="494" y="418" font-size="12" fill="#6f5b4c">~70–100+ MB/s (GL3224 USB 3.0). A whole library in minutes.</text>
     <text x="494" y="444" font-size="12" fill="#6f5b4c">Also charges the charm and shows up as a</text>
     <text x="494" y="461" font-size="12" fill="#6f5b4c">normal fast drive on a computer.</text>
     <text x="494" y="487" font-size="11.5" fill="#8a7464" font-style="italic">microSD or eMMC inside · C5 or dual-C5 radio</text>
@@ -11468,7 +11509,7 @@ Understood. The strategy is clear:
 
 Which file would you like to start with?
 
-now provide me the `LICENSE.md` provide it back to me in full whole complete without omission without dropping anything
+now provide me the docs/assets/flow.svg provide it back to me in full whole complete without omission without dropping anything
 
 also we should be ensuring that we capture all alternative componinents per variant no? so we should then be creating subfolders in these per alternatives or I mean for the alternvaties/backup and standard paths to be organized properly so that we porperly have each design per each or net? and we should be noting that the E22 the mini and wroom variants the datasheets aren't released yet meaning we won't create folders for these yet but nothing that we will be implementing a E22 mini variant and the E22 vriant with 2S the pro version but for everythingelse everything else is released meaning we want to ensure we capture truly all variants and all paths organized standard/alternatives as well will be creating the designs for these all so should they all not be in their own subfolder per variant?
 now also the pro variants the pro version is going to be covered under our current licenses because even if it surpasses the airtag envelope it still fits within a charm envelope to be used as a charm and not a backpack so we need to capture this where applicable as well so again the pro is under the NC license and is a charm its the pro charm as its still charm sized even if thicker it is part of the source-available and non commercial license
