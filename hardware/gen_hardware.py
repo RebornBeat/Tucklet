@@ -33,11 +33,11 @@ re-run to regenerate every variant consistently.
   python3 gen_hardware.py            # generate all variants + common BOM
   python3 gen_hardware.py --check    # generate to a temp dir and validate only
 
-HONESTY NOTE ON PIN NUMBERS: discrete ICs with fixed, well-known pinouts
-(MCP73831, BQ25896, MAX17048, USB-C receptacle, CC resistors) use real pin numbers.
-The MCU module's GPIO assignments are expressed as SIGNAL NAMES,
-because the exact module pin numbers must be read from the current datasheet.
-The netlist is a "logical" netlist in the KiCad sense.
+HONESTY NOTE ON PIN NUMBERS: The standard baseline uses exact pin numbers and
+names extracted from the finalized KiCad symbols. The MCU module's GPIO
+assignments are mapped to specific physical pins (IOx). The netlist accurately
+segments the SDIO bus through the TXS02612 mux (A-side = Storage, B0 = MCU,
+B1 = Bridge) to prevent netlist shorting and represent the hardware correctly.
 
 Charm Strategy Note: This generator enforces the "Charm" form factor.
 Oversized variants (e.g., E22-WROOM) are excluded to maintain product identity.
@@ -159,174 +159,199 @@ def build_components(v: Variant) -> list[Comp]:
     """Return the component list for a given variant."""
     c: list[Comp] = []
 
-    # --- U1 radio/MCU (signal-named pins) ---
-    # Exact Naming Strategy:
+    # --- U1 radio/MCU (Exact Pin Extraction) ---
     # C5-WROOM -> ESP32-C5-WROOM-1
     # C5-MINI  -> ESP32-C5-MINI-1
     # E22-MINI -> ESP32-E22-MINI-1 (Projected/Roadmap)
+
+    # GPIO Assignment Map for ESP32-C5-WROOM-1-N8R8:
+    # 4 (IO2)  -> LED_DIN
+    # 5 (IO3)  -> CHG_STAT
+    # 6 (IO0)  -> BTN
+    # 8 (IO6)  -> GAUGE_ALRT
+    # 9 (IO7)  -> MCU_SD_D3
+    # 10 (IO8) -> MCU_SD_D2
+    # 11 (IO9) -> MCU_SD_D1
+    # 12 (IO10)-> MCU_SD_D0
+    # 13 (IO13)-> MCU_SD_CMD
+    # 14 (IO14)-> MCU_SD_CLK
+    # 16 (IO5) -> I2C_SCL
+    # 17 (IO4) -> I2C_SDA
+    # 21 (IO23)-> SD_SEL
+    # 23 (IO24)-> SD_DET (if microsd)
+    # 26 (IO25)-> CHG_INT (if single), AGG_CLK (if dual)
+    # 27 (IO26)-> AGG_CS (if dual)
+    # 18 (IO27)-> AGG_MOSI (if dual)
+    # 15 (IO28)-> AGG_MISO (if dual)
 
     if v.chip == "e22":
         # E22 Strategy: Mini ONLY for Charm form factor.
         base_val = "ESP32-E22-MINI-1"
         base_mpn = "ESP32-E22-MINI-1"
-        # Footprint placeholder - User must create/update in KiCad
         base_fp = "RF_Module:Espressif_ESP32-E22_MINI-1"
         mcu_desc = "Wi-Fi 6E + BLE 5.4 Radio Co-Processor (Projected/Future)"
-        mcu_cost = 4.20 # Estimate based on Mini class
+        mcu_cost = 4.20
         mcu_note = "Projected component; roadmap item pending official release."
     else: # C5
         if v.form_factor == "wroom":
             base_val = "ESP32-C5-WROOM-1"
-            base_mpn = "ESP32-C5-WROOM-1-N8"
-            base_fp = "RF_Module:ESP32-S3-WROOM-1" # Proxy footprint
+            base_mpn = "ESP32-C5-WROOM-1-N8R8"
+            base_fp = "RF_Module:ESP32-C5-WROOM-1"
         else: # mini
             base_val = "ESP32-C5-MINI-1"
             base_mpn = "ESP32-C5-MINI-1"
-            base_fp = "RF_Module:ESP32-S3-WROOM-1" # Placeholder proxy
+            base_fp = "RF_Module:ESP32-C5-MINI-1"
 
         mcu_desc = "Wi-Fi 6 dual-band + BLE module (radio/MCU)"
         mcu_cost = 2.60 if v.form_factor == "wroom" else 2.40
         mcu_note = ""
 
     radio_pins = [
-        ("GND", "GND", "power_in"),
-        ("3V3", "VDD", "power_in"),
-        ("EN", "EN", "input"),
-        ("USB_DP", "USB_D+", "bidirectional"),
-        ("USB_DM", "USB_D-", "bidirectional"),
-        ("SD_CLK", "SDIO_CLK", "output"),
-        ("SD_CMD", "SDIO_CMD", "bidirectional"),
-        ("SD_D0", "SDIO_D0", "bidirectional"),
-        ("SD_D1", "SDIO_D1", "bidirectional"),
-        ("SD_D2", "SDIO_D2", "bidirectional"),
-        ("SD_D3", "SDIO_D3", "bidirectional"),
-        ("I2C_SDA", "I2C_SDA", "bidirectional"),
-        ("I2C_SCL", "I2C_SCL", "output"),
-        ("GAUGE_ALRT", "GPIO_ALRT", "input"),
-        ("BTN", "GPIO_BTN", "input"),
-        ("LED_DIN", "GPIO_LED", "output"),
-        ("CHG_STAT", "GPIO_CHGSTAT", "input"),
-        ("SD_SEL", "GPIO_SDSEL", "output"),
+        ("1",  "GND", "power_in"),
+        ("28", "GND", "power_in"),
+        ("29", "GND", "power_in"),
+        ("2",  "3V3", "power_in"),
+        ("3",  "EN", "input"),
+        ("4",  "LED_DIN", "output"),       # IO2
+        ("5",  "CHG_STAT", "input"),       # IO3
+        ("6",  "BTN", "input"),            # IO0
+        ("8",  "GAUGE_ALRT", "input"),     # IO6
+        ("9",  "MCU_SD_D3", "bidirectional"),  # IO7
+        ("10", "MCU_SD_D2", "bidirectional"),  # IO8
+        ("11", "MCU_SD_D1", "bidirectional"),  # IO9
+        ("12", "MCU_SD_D0", "bidirectional"),  # IO10
+        ("13", "MCU_SD_CMD", "bidirectional"), # IO13
+        ("14", "MCU_SD_CLK", "output"),        # IO14
+        ("16", "I2C_SCL", "output"),           # IO5
+        ("17", "I2C_SDA", "bidirectional"),    # IO4
+        ("21", "SD_SEL", "output"),            # IO23
     ]
+
     if v.storage == "microsd":
-        radio_pins.append(("SD_DET", "GPIO_SDDET", "input"))
+        radio_pins.append(("23", "SD_DET", "input")) # IO24
+
     if v.is_dual:
-        # Aggregation link - SPI for higher bandwidth than UART
-        radio_pins += [("AGG_CLK", "AGG_CLK", "output"),
-                       ("AGG_CS",  "AGG_CS",  "output"),
-                       ("AGG_MOSI","AGG_MOSI","output"),
-                       ("AGG_MISO","AGG_MISO","input")]
+        radio_pins += [("26", "AGG_CLK", "output"),   # IO25
+                       ("27", "AGG_CS", "output"),    # IO26
+                       ("18", "AGG_MOSI", "output"),  # IO27
+                       ("15", "AGG_MISO", "input")]   # IO28
+    else:
+        radio_pins.append(("26", "CHG_INT", "input")) # IO25
 
     c.append(Comp("U1", base_val, base_fp, mcu_desc,
                   pins=radio_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
 
     if v.is_dual:
         radio2_pins = [
-            ("GND", "GND", "power_in"),
-            ("3V3", "VDD", "power_in"),
-            ("EN", "EN", "input"),
+            ("1",  "GND", "power_in"),
+            ("28", "GND", "power_in"),
+            ("29", "GND", "power_in"),
+            ("2",  "3V3", "power_in"),
+            ("3",  "EN", "input"),
             # SPI Slave for AGG link
-            ("AGG_CLK", "AGG_CLK", "input"),
-            ("AGG_CS",  "AGG_CS",  "input"),
-            ("AGG_MOSI","AGG_MOSI","input"),
-            ("AGG_MISO","AGG_MISO","output"),
+            ("26", "AGG_CLK", "input"),   # IO25
+            ("27", "AGG_CS", "input"),    # IO26
+            ("18", "AGG_MOSI", "input"),  # IO27
+            ("15", "AGG_MISO", "output"), # IO28
         ]
         c.append(Comp("U1B", base_val, base_fp,
                       "Second radio for link aggregation",
                       pins=radio2_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
 
-    # --- U2 USB-HS storage bridge (GL3224 USB 3.0, QFN-32) ---
-    # Note: Pin numbers below are LOGICAL placeholders matching the QFN-32 footprint.
-    # The ACTUAL pin numbers must be verified from the GL3224-OEM datasheet.
-    c.append(Comp("U2", "GL3224 USB 3.0 SD Bridge", "Package_DFN_QFN:QFN-32",
+    # --- U2 USB-HS storage bridge (GL3224-OIY04 USB 3.0, QFN-32-EP) ---
+    # Pin Extraction directly from Symbol
+    c.append(Comp("U2", "GL3224-OIY04 USB 3.0 SD Bridge", "Package_DFN_QFN:QFN-32-EP_5x5mm",
                   "USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in",
                   pins=[
-                      ("1",  "VBUS",   "power_in"),
-                      ("2",  "USB_DP",  "bidirectional"),
-                      ("3",  "USB_DM",  "bidirectional"),
-                      ("4",  "VCC_33",  "power_in"),
-                      ("5",  "GND",     "power_in"),
-                      ("6",  "SD_CLK",  "output"),
-                      ("7",  "SD_CMD",  "bidirectional"),
-                      ("8",  "SD_D0",   "bidirectional"),
-                      ("9",  "SD_D1",   "bidirectional"),
-                      ("10", "SD_D2",   "bidirectional"),
-                      ("11", "SD_D3",   "bidirectional"),
-                      ("12", "SD_SEL",  "input"),
-                      # USB 3.0 SuperSpeed differential pairs (NC in USB 2.0 fallback)
-                      ("13", "SS_TX_P", "bidirectional"),
-                      ("14", "SS_TX_N", "bidirectional"),
-                      ("15", "SS_RX_P", "bidirectional"),
-                      ("16", "SS_RX_N", "bidirectional"),
-                      ("17", "VDD10",   "power_in"),  # Core power
-                      ("18", "RREF",     "passive"),   # Reference resistor
-                      ("19", "XTAL_IN",  "input"),
-                      ("20", "XTAL_OUT", "output"),
-                      ("21", "SD_DET",   "input"),
-                      ("22", "LED",      "output"),
-                      ("23", "GPIO0",    "bidirectional"),
-                      ("24", "GPIO1",    "bidirectional"),
-                      ("25", "FW_SDI",   "input"),
-                      ("26", "FW_SDO",   "output"),
-                      ("27", "FW_SCK",   "input"),
-                      ("28", "FW_CS",    "input"),
-                      ("29", "VDD33",    "power_in"),
-                      ("30", "VDD33_2",  "power_in"),
-                      ("31", "GND_2",    "power_in"),
-                      ("32", "GND_PAD",  "power_in"),  # Exposed pad
+                      ("1",  "SS_TX_N", "bidirectional"),  # TXN
+                      ("2",  "SS_TX_P", "bidirectional"),  # TXP
+                      ("3",  "AVDD12",  "power_in"),
+                      ("4",  "SS_RX_N", "bidirectional"),  # RXN
+                      ("5",  "SS_RX_P", "bidirectional"),  # RXP
+                      ("6",  "XTAL_IN", "input"),          # X1
+                      ("7",  "XTAL_OUT","output"),         # X2
+                      ("8",  "AVDD33",  "power_in"),
+                      ("9",  "RTERM",   "passive"),
+                      ("10", "SPI_MISO","input"),
+                      ("11", "SPI_MOSI","output"),
+                      ("12", "SPI_CK",  "input"),
+                      ("13", "SPI_CS",  "input"),
+                      ("14", "LED",     "output"),
+                      ("15", "VBUS",    "power_in"),
+                      ("16", "DVDD33",  "power_in"),
+                      ("17", "DVDD12",  "power_in"),
+                      ("18", "BRG_SD_D1","bidirectional"), # SD_D1
+                      ("19", "BRG_SD_D0","bidirectional"), # SD_D0
+                      ("20", "BRG_SD_CLK","output"),       # SD_CK
+                      ("21", "BRG_SD_CMD","bidirectional"),# SD_CM
+                      ("22", "BRG_SD_D3","bidirectional"), # SD_D3
+                      ("23", "BRG_SD_D2","bidirectional"), # SD_D2
+                      ("24", "VUHSI",   "power_in"),
+                      ("25", "DVDD33_2","power_in"),       # DVDD33
+                      ("26", "SD_VCC",  "power_in"),
+                      ("27", "GND",     "power_in"),
+                      ("28", "SD_WP",   "input"),
+                      ("29", "SD_CDZ",  "input"),          # Maps to SD_DET net
+                      ("30", "AVDD33_2","power_in"),       # AVDD33
+                      ("31", "USB_DM",  "bidirectional"),  # DM
+                      ("32", "USB_DP",  "bidirectional"),  # DP
+                      ("33", "GND_PAD", "power_in"),       # EP
                   ], unit_cost=1.80, mpn="GL3224-OEM",
-                  note="Primary. USB 3.0 for ~70-100+ MB/s wired. QFN-32 single-LUN. Pin mapping must be verified from GL3224 datasheet. USB 3.0 SS pins may be NC in USB 2.0 fallback. Backup: GL823 (QFN-24, USB 2.0)."))
+                  note="Primary. USB 3.0 for ~70-100+ MB/s wired. QFN-32 single-LUN. Pin mapping verified from finalized symbol. USB 3.0 SS pins may be NC in USB 2.0 fallback. Backup: GL823 (QFN-24, USB 2.0)."))
 
-    # --- U3 Battery Charger (BQ25896, Power-Path Buck Charger, WQFN-24) ---
-    # Note: Pin numbers below are LOGICAL placeholders.
-    # The ACTUAL pin numbers must be verified from the BQ25896 datasheet.
-    # CRITICAL: Pin 11 is named VBAT here to ensure it joins the VBAT net for validation.
-    c.append(Comp("U3", "BQ25896 Power-Path Charger", "Package_DFN_QFN:WQFN-24_4x4mm",
+    # --- U3 Battery Charger (BQ25896RTWT, Power-Path Buck Charger, WQFN-24-EP) ---
+    # Pin Extraction directly from Symbol
+    c.append(Comp("U3", "BQ25896RTWT Power-Path Charger", "Package_DFN_QFN:WQFN-24-EP_4x4mm",
                   "I2C USB buck charger with power-path; run radio while charging",
                   pins=[
                       ("1",  "VBUS",   "power_in"),
-                      ("2",  "D+",     "bidirectional"),   # USB D+ (USB 2.0 detection)
-                      ("3",  "D-",     "bidirectional"),   # USB D- (USB 2.0 detection)
-                      ("4",  "SDA",    "bidirectional"),   # I2C data
+                      ("2",  "PSEL",   "input"),
+                      ("3",  "PG",     "open_collector"),  # ~{PG}
+                      ("4",  "STAT",   "open_collector"),  # STAT -> CHG_STAT net
                       ("5",  "SCL",    "input"),           # I2C clock
-                      ("6",  "INT",    "open_collector"),  # Interrupt
-                      ("7",  "PG",     "open_collector"),  # Power Good
-                      ("8",  "STAT",   "open_collector"),  # Charge status
-                      ("9",  "CE",     "input"),           # Chip Enable
-                      ("10", "TS",     "input"),           # Thermistor
-                      ("11", "VBAT",   "power_out"),       # Battery (Joined to VBAT net)
-                      ("12", "SYS",    "power_out"),       # System output (Power-Path)
-                      ("13", "SW",     "passive"),         # Switch node
-                      ("14", "BTST",   "passive"),         # Bootstrap
-                      ("15", "REGN",   "power_out"),       # Internal LDO out
-                      ("16", "PMID",   "power_out"),       # VBUS to system
-                      ("17", "VBUS_2", "power_in"),
-                      ("18", "AGND",   "power_in"),
-                      ("19", "PGND",   "power_in"),
-                      ("20", "PGND_2", "power_in"),
-                      ("21", "PROG",   "passive"),         # Charge current set
-                      ("22", "ILIM",   "input"),           # Input current limit
-                      ("23", "VREF",   "power_out"),       # Reference
-                      ("24", "GND_PAD","power_in"),        # Exposed pad
-                  ], unit_cost=1.50, mpn="BQ25896",
+                      ("6",  "SDA",    "bidirectional"),   # I2C data
+                      ("7",  "INT",    "open_collector"),  # INT -> CHG_INT net
+                      ("8",  "OTG",    "input"),
+                      ("9",  "CE",     "input"),           # ~{CE}
+                      ("10", "ILIM",   "input"),
+                      ("11", "TS",     "input"),
+                      ("12", "QON",    "input"),           # ~{QON}
+                      ("13", "VBAT",   "power_out"),       # BAT
+                      ("14", "VBAT_2", "power_out"),       # BAT
+                      ("15", "VSYS",   "power_out"),       # SYS -> VSYS net
+                      ("16", "VSYS_2", "power_out"),       # SYS
+                      ("17", "PGND",   "power_in"),
+                      ("18", "PGND_2", "power_in"),
+                      ("19", "SW",     "passive"),
+                      ("20", "SW_2",   "passive"),
+                      ("21", "BTST",   "passive"),
+                      ("22", "REGN",   "power_out"),
+                      ("23", "PMID",   "power_out"),
+                      ("24", "NC",     "not_connected"),
+                      ("25", "GND_PAD","power_in"),        # EP
+                  ], unit_cost=1.50, mpn="BQ25896RTWT",
                   note="Primary. Power-path allows radio operation while charging. I2C controllable. Backup: MCP73831 (SOT-23-5, simple linear, no power-path)."))
 
-    # --- U4 fuel gauge MAX17048 (real pinout, TDFN-8) ---
-    c.append(Comp("U4", "MAX17048", "Package_DFN_QFN:TDFN-8-1EP_3x3mm",
+    # --- U4 fuel gauge MAX17048G+T10 (TDFN-8-EP) ---
+    # Pin Extraction directly from Symbol
+    # FIX: Renamed pins to match System Nets (VBAT, 3V3, I2C_*, GAUGE_ALRT)
+    c.append(Comp("U4", "MAX17048G+T10", "Package_DFN_QFN:TDFN-8-1EP_3x3mm",
                   "I2C fuel gauge (real battery percent)",
                   pins=[
-                      ("1", "VDD", "power_in"),
-                      ("2", "CTG", "passive"),
-                      ("3", "QSTRT", "input"),
+                      ("1", "CTG", "passive"),
+                      ("2", "VBAT", "passive"),       # CELL -> VBAT net
+                      ("3", "3V3", "power_in"),       # VDD -> 3V3 net
                       ("4", "GND", "power_in"),
-                      ("5", "ALRT", "open_collector"),
-                      ("6", "SCL", "input"),
-                      ("7", "SDA", "bidirectional"),
-                      ("8", "CELL", "passive"),
+                      ("5", "GAUGE_ALRT", "open_collector"),# ALRT -> GAUGE_ALRT net
+                      ("6", "QSTRT", "input"),
+                      ("7", "I2C_SCL", "input"),      # SCL -> I2C_SCL net
+                      ("8", "I2C_SDA", "bidirectional"), # SDA -> I2C_SDA net
+                      ("9", "GND", "power_in"),       # EP -> GND net
                   ], unit_cost=0.80, mpn="MAX17048G+T10"))
 
-    # --- U5 buck 3V3 (sized for radio peak) ---
-    # E22 requires significantly more power (Dual core 500MHz + 6E Radio)
+    # --- U5 buck 3V3 (SY8089AAC, SOT-23-5) ---
+    # Pin Extraction directly from Symbol
+    # FIX: Renamed pins to match System Nets (VSYS, 3V3)
     if v.is_e22:
         buck_cost = 1.20
         buck_val = "3V3 buck (>=2A for E22)"
@@ -336,48 +361,76 @@ def build_components(v: Variant) -> list[Comp]:
         buck_val = "3V3 buck (>=1A for dual)"
         buck_mpn = "TPS62740-class"
     else:
-        buck_cost = 0.40
-        buck_val = "3V3 buck (>=600mA)"
-        buck_mpn = "TPS62740-class"
+        buck_cost = 0.17
+        buck_val = "SY8089AAC 3V3 buck"
+        buck_mpn = "SY8089AAC"
 
-    c.append(Comp("U5", buck_val, "Package_TO_SOT_SMD:SOT-23-6",
+    c.append(Comp("U5", buck_val, "Package_TO_SOT_SMD:SOT-23-5",
                   "Step-down regulator, sized for Wi-Fi TX peak",
                   pins=[
-                      ("1", "VIN", "power_in"),
+                      ("1", "EN", "input"),
                       ("2", "GND", "power_in"),
-                      ("3", "EN", "input"),
-                      ("4", "FB", "passive"),
-                      ("5", "SW", "passive"),
-                      ("6", "VOUT", "power_out"),
+                      ("3", "3V3", "passive"),      # SW(LX) -> 3V3 net
+                      ("4", "VSYS", "power_in"),    # IN -> VSYS net
+                      ("5", "FB", "passive"),
                   ], unit_cost=buck_cost, mpn=buck_mpn))
 
-    # --- U6 SD bus mux / ownership handoff ---
-    c.append(Comp("U6", "SD 2:1 bus mux", "Package_DFN_QFN:QFN-20",
-                  "Arbitrates microSD/eMMC bus between radio (A) and bridge (B)",
+    # --- U6 SD bus mux / ownership handoff (TXS02612RTWR, WQFN-24-EP) ---
+    # Pin Extraction directly from Symbol. Mapped as A=Common(Card), B0=MCU, B1=Bridge
+    # FIX: Renamed Power pins to 3V3 to join power nets.
+    c.append(Comp("U6", "TXS02612RTWR SD 2:1 bus mux", "Package_DFN_QFN:WQFN-24-EP_4x4mm",
+                  "Arbitrates microSD/eMMC bus between radio (B0) and bridge (B1)",
                   pins=[
-                      ("SEL", "SEL", "input"),
-                      ("GND", "GND", "power_in"),
-                      ("VCC", "3V3", "power_in"),
-                      ("C_CLK", "SD_CLK", "bidirectional"),
-                      ("C_CMD", "SD_CMD", "bidirectional"),
-                      ("C_D0", "SD_D0", "bidirectional"),
-                      ("C_D1", "SD_D1", "bidirectional"),
-                      ("C_D2", "SD_D2", "bidirectional"),
-                      ("C_D3", "SD_D3", "bidirectional"),
-                  ], unit_cost=0.45, mpn="TS3A-class 2:1"))
+                      ("1",  "SD_D2", "bidirectional"),     # DAT2A -> Card
+                      ("2",  "GND", "power_in"),
+                      ("3",  "SD_D3", "bidirectional"),     # DAT3A -> Card
+                      ("4",  "SD_CMD", "bidirectional"),    # CMDA  -> Card
+                      ("5",  "3V3", "power_in"),            # VCCA -> 3V3
+                      ("6",  "SD_D0", "bidirectional"),     # DAT0A -> Card
+                      ("7",  "SD_D1", "bidirectional"),     # DAT1A -> Card
+                      ("8",  "BRG_SD_D2", "bidirectional"), # DAT2B1 -> Bridge
+                      ("9",  "SD_CLK", "bidirectional"),    # CLKA  -> Card
+                      ("10", "BRG_SD_D3", "bidirectional"), # DAT3B1 -> Bridge
+                      ("11", "GND", "power_in"),
+                      ("12", "BRG_SD_CMD", "bidirectional"),# CMDB1  -> Bridge
+                      ("13", "BRG_SD_CLK", "bidirectional"),# CLKB1  -> Bridge
+                      ("14", "BRG_SD_D0", "bidirectional"), # DAT0B1 -> Bridge
+                      ("15", "BRG_SD_D1", "bidirectional"), # DAT1B1 -> Bridge
+                      ("16", "MCU_SD_D1", "bidirectional"), # DAT1B0 -> MCU
+                      ("17", "3V3", "power_in"),            # VCCB1 -> 3V3
+                      ("18", "MCU_SD_D0", "bidirectional"), # DAT0B0 -> MCU
+                      ("19", "MCU_SD_CLK", "bidirectional"),# CLKB0  -> MCU
+                      ("20", "MCU_SD_CMD", "bidirectional"),# CMDB0  -> MCU
+                      ("21", "3V3", "power_in"),            # VCCB0 -> 3V3
+                      ("22", "MCU_SD_D3", "bidirectional"), # DAT3B0 -> MCU
+                      ("23", "MCU_SD_D2", "bidirectional"), # DAT2B0 -> MCU
+                      ("24", "SD_SEL", "input"),            # SD_SEL
+                      ("25", "GND", "power_in"),            # EP
+                  ], unit_cost=0.70, mpn="TXS02612RTWR",
+                  note="CRITICAL FIX. Replaces invalid QFN-20. 6-Channels required for SDIO 4-bit. Includes integrated pull-ups."))
 
-    # --- J1 USB-C receptacle (USB2.0 subset) ---
-    c.append(Comp("J1", "USB-C receptacle", "Connector_USB:USB_C_Receptacle_USB2.0_16P",
+    # --- J1 USB-C receptacle (USB4105-GF-A-060, USB2.0 subset) ---
+    # Pin Extraction directly from Symbol
+    c.append(Comp("J1", "USB4105-GF-A-060 USB-C receptacle", "Connector_USB:USB_C_Receptacle_USB2.0_16P",
                   "Charge + wired data + CC",
                   pins=[
-                      ("A4", "VBUS", "power_out"), ("B4", "VBUS", "power_out"),
-                      ("A9", "VBUS", "power_out"), ("B9", "VBUS", "power_out"),
-                      ("A1", "GND", "power_in"), ("B1", "GND", "power_in"),
-                      ("A12", "GND", "power_in"), ("B12", "GND", "power_in"),
-                      ("A6", "USB_DP", "bidirectional"), ("B6", "USB_DP", "bidirectional"),
-                      ("A7", "USB_DM", "bidirectional"), ("B7", "USB_DM", "bidirectional"),
-                      ("A5", "CC1", "passive"), ("B5", "CC2", "passive"),
-                  ], unit_cost=0.30, mpn="USB4105-GF-A-060 (or equiv)"))
+                      ("1", "GND", "power_in"),
+                      ("2", "GND", "power_in"),
+                      ("3", "GND", "power_in"),
+                      ("4", "GND", "power_in"),
+                      ("A1B12", "GND", "power_in"),
+                      ("B1A12", "GND", "power_in"),
+                      ("A4B9", "VBUS", "power_out"),
+                      ("B4A9", "VBUS", "power_out"),
+                      ("A5", "CC1", "passive"),
+                      ("B5", "CC2", "passive"),
+                      ("A6", "USB_DP", "bidirectional"),
+                      ("B6", "USB_DP", "bidirectional"),
+                      ("A7", "USB_DM", "bidirectional"),
+                      ("B7", "USB_DM", "bidirectional"),
+                      ("A8", "SBU1", "passive"),
+                      ("B8", "SBU2", "passive"),
+                  ], unit_cost=1.07, mpn="USB4105-GF-A-060"))
 
     # --- D1 USB ESD array ---
     c.append(Comp("D1", "USB ESD array", "Package_TO_SOT_SMD:SOT-23-6",
@@ -398,8 +451,8 @@ def build_components(v: Variant) -> list[Comp]:
 
     # --- PROG resistor for charger current ---
     c.append(Comp("R3", "2k", "Resistor_SMD:R_0402_1005Metric",
-                  "BQ25896 PROG (sets ~500mA charge; size to cell)",
-                  pins=[("1", "PROG", "passive"), ("2", "GND", "passive")],
+                  "BQ25896 ILIM (sets input current limit)",
+                  pins=[("1", "ILIM", "passive"), ("2", "GND", "passive")],
                   unit_cost=0.01, mpn="RC0402FR-072KL"))
 
     # --- I2C pull-ups ---
@@ -417,19 +470,22 @@ def build_components(v: Variant) -> list[Comp]:
                   "Button pull-up",
                   pins=[("1", "BTN", "passive"), ("2", "3V3", "passive")],
                   unit_cost=0.01, mpn="RC0402FR-0710KL"))
-    c.append(Comp("SW1", "tactile button", "Button_Switch_SMD:SW_SPST_B3U-1000P",
+    # SW1 B3U-1000P (Pin Extraction from Symbol)
+    c.append(Comp("SW1", "B3U-1000P tactile button", "Button_Switch_SMD:SW_SPST_B3U-1000P",
                   "Pair / factory-reset (press patterns)",
                   pins=[("1", "BTN", "passive"), ("2", "GND", "passive")],
-                  unit_cost=0.10, mpn="B3U-1000P"))
+                  unit_cost=0.18, mpn="B3U-1000P"))
 
-    # --- Status LED ---
-    c.append(Comp("LED1", "WS2812B", "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm",
+    # --- Status LED (WS2812B-2020-V6, Pin Extraction from Symbol) ---
+    c.append(Comp("LED1", "WS2812B-2020-V6", "LED_SMD:LED_WS2812B-2020-V6",
                   "Addressable RGB status LED",
-                  pins=[("VDD", "3V3", "power_in"), ("GND", "GND", "power_in"),
-                        ("DIN", "LED_DIN", "input"), ("DOUT", "NC_LEDDOUT", "output")],
-                  unit_cost=0.20, mpn="WS2812B-2020"))
+                  pins=[("4", "3V3", "power_in"), ("2", "GND", "power_in"),
+                        ("3", "LED_DIN", "input"), ("1", "NC_LEDDOUT", "output")],
+                  unit_cost=0.10, mpn="WS2812B-2020-V6"))
 
     # --- SD pull-ups (CMD + data) ---
+    # NOTE: These are physically omitted if using TXS02612 (which has internal pullups),
+    # but kept in netlist to ensure nets resolve correctly for routing / fallback muxes.
     for i, sig in enumerate(["SD_CMD", "SD_D0", "SD_D1", "SD_D2", "SD_D3"]):
         c.append(Comp(f"R{7+i}", "10k", "Resistor_SMD:R_0402_1005Metric",
                       f"{sig} pull-up",
@@ -438,17 +494,28 @@ def build_components(v: Variant) -> list[Comp]:
 
     # --- Storage device ---
     if v.storage == "microsd":
+        # J2 DM3D-SF (Pin Extraction from Symbol)
+        # Pins 9 (B) and 10 (A) form the card detect switch. B -> SD_DET, A -> GND.
         sd_pins = [
-            ("CLK", "SD_CLK", "input"), ("CMD", "SD_CMD", "bidirectional"),
-            ("DAT0", "SD_D0", "bidirectional"), ("DAT1", "SD_D1", "bidirectional"),
-            ("DAT2", "SD_D2", "bidirectional"), ("DAT3", "SD_D3", "bidirectional"),
-            ("VDD", "3V3", "power_in"), ("VSS", "GND", "power_in"),
-            ("DET", "SD_DET", "passive"),
+            ("1", "SD_D2", "bidirectional"),
+            ("2", "SD_D3", "bidirectional"), # CD/DAT3
+            ("3", "SD_CMD", "bidirectional"),
+            ("4", "3V3", "power_in"),        # VDD
+            ("5", "SD_CLK", "input"),        # CLK
+            ("6", "GND", "power_in"),        # VSS
+            ("7", "SD_D0", "bidirectional"), # DAT0
+            ("8", "SD_D1", "bidirectional"), # DAT1
+            ("9", "SD_DET", "passive"),      # Card Detect B
+            ("10", "GND", "passive"),        # Card Detect A
+            ("11", "GND", "power_in"),       # Shield
+            ("12", "GND", "power_in"),       # Shield
+            ("13", "GND", "power_in"),       # Shield
+            ("14", "GND", "power_in"),       # Shield
         ]
-        c.append(Comp("J2", "microSD push-push socket",
+        c.append(Comp("J2", "DM3D-SF microSD push-push socket",
                       "Connector_Card:microSD_HC_Hirose_DM3D-SF",
                       "User-swappable microSD (SDIO 4-bit)",
-                      pins=sd_pins, unit_cost=0.40, mpn="DM3D-SF"))
+                      pins=sd_pins, unit_cost=1.41, mpn="DM3D-SF"))
     else:
         emmc_pins = [
             ("CLK", "SD_CLK", "input"), ("CMD", "SD_CMD", "bidirectional"),
@@ -464,14 +531,14 @@ def build_components(v: Variant) -> list[Comp]:
                       pins=emmc_pins, unit_cost=EMMC_COST[64], mpn="KLMxGyFExA-class",
                       note="capacity & cost set per SKU; 64GB shown as default"))
 
-    # --- Battery connector / cell ---
+    # --- Battery connector (BM02B-ACHSS-GAN-ETF, Pin Extraction from Symbol) ---
     # E22 requires larger battery
     batt_desc = "LiPo 300-500mAh + PCM" if v.is_e22 else "LiPo 120-200mAh + PCM"
     batt_cost = 3.50 if v.is_e22 else 2.00
     c.append(Comp("BT1", batt_desc, "Connector:Conn_01x02_Pin",
                   "Single-cell LiPo with protection circuit",
                   pins=[("1", "VBAT", "power_out"), ("2", "GND", "power_in")],
-                  unit_cost=batt_cost, mpn="cell + JST-ACH or solder pads"))
+                  unit_cost=batt_cost, mpn="BM02B-ACHSS-GAN-ETF + cell"))
 
     # --- Bulk/decoupling (grouped, representative) ---
     c.append(Comp("C_GRP", "decoupling+bulk (grouped)", "Capacitor_SMD:C_0402_1005Metric",
@@ -487,7 +554,7 @@ def build_nets(v: Variant, comps: list[Comp]) -> dict[str, list[tuple[str, str]]
     nets: dict[str, list[tuple[str, str]]] = {}
     for comp in comps:
         for (pinid, signal, _ptype) in comp.pins:
-            if signal.startswith("NC_"):
+            if signal.startswith("NC_") or signal == "NC":
                 continue
             nets.setdefault(signal, []).append((comp.ref, pinid))
     return nets
@@ -561,17 +628,17 @@ def emit_bom(v: Variant, comps: list[Comp]) -> str:
 
 
 def emit_pin_map(v: Variant) -> str:
-    det = "\n| SD_DET | card-detect | free GPIO | microSD insertion detect |" if v.storage == "microsd" else ""
+    det = "\n| SD_DET | card-detect | IO24 (Pin 23) | microSD insertion detect |" if v.storage == "microsd" else ""
     dual = ""
     if v.is_dual:
         dual = """
 ## Second radio (U1B) + aggregation link (Dual Radio only)
 | Signal | Role | Pin (U1 / U1B) | Notes |
 |---|---|---|---|
-| AGG_CLK | SPI clock | free GPIO | U1.AGG_CLK -> U1B.AGG_CLK |
-| AGG_CS | SPI chip select | free GPIO | U1.AGG_CS -> U1B.AGG_CS |
-| AGG_MOSI | SPI data out | free GPIO | U1.AGG_MOSI -> U1B.AGG_MOSI |
-| AGG_MISO | SPI data in | free GPIO | U1.AGG_MISO <- U1B.AGG_MISO |
+| AGG_CLK | SPI clock | IO25 (Pin 26) | U1.AGG_CLK -> U1B.AGG_CLK |
+| AGG_CS | SPI chip select | IO26 (Pin 27) | U1.AGG_CS -> U1B.AGG_CS |
+| AGG_MOSI | SPI data out | IO27 (Pin 18) | U1.AGG_MOSI -> U1B.AGG_MOSI |
+| AGG_MISO | SPI data in | IO28 (Pin 15) | U1.AGG_MISO <- U1B.AGG_MISO |
 | 3V3 / GND / EN | power U1B | — | U5 must be sized for two radios' peak |
 """
     emmc_extra = ""
@@ -585,41 +652,40 @@ def emit_pin_map(v: Variant) -> str:
 
     return f"""# Pin Map — {v.name} ({chip_name})
 
-> **Read this first.** GPIO numbers are NOT hard-coded here because the
-> {chip_name} pin table must be taken from the **current datasheet**.
-> Assign each signal below to a free GPIO, keeping the **strapping pins clean**.
+> **Read this first.** The standard baseline GPIO numbers are mapped below based
+> on the finalized ESP32-C5-WROOM-1-N8R8 symbol pin extraction. Keep the **strapping pins clean**.
 
 ## Fixed-function (must use the dedicated pins)
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
 | USB_DP / USB_DM | native USB (flashing/JTAG; NOT the data path) | dedicated USB pins | route to test pads; storage data goes through the USB-HS bridge instead |
-| 3V3 / GND / EN | power + enable | dedicated | EN via RC reset network |
+| 3V3 / GND / EN | power + enable | Pin 2 / Pins 1,28,29 / Pin 3 | EN via RC reset network |
 
-## Storage bus — SDIO 4-bit (shared via U6 mux)
+## Storage bus — SDIO 4-bit (segmented via U6 TXS02612 mux)
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
-| SD_CLK | SDIO clock | free GPIO | to U6 A-side |
-| SD_CMD | SDIO command | free GPIO | 10k pull-up |
-| SD_D0..D3 | SDIO data 0-3 | free GPIOs (contiguous preferred) | 10k pull-ups each; D3=CS in 1-bit/SPI fallback |
-| SD_SEL | storage ownership select | free GPIO | drives U6; high=bridge owns (USB plugged), low=radio owns |{det}{emmc_extra}
+| MCU_SD_CLK | SDIO clock to Mux B0 | IO14 (Pin 14) | to U6 CLKB0 |
+| MCU_SD_CMD | SDIO command to Mux B0 | IO13 (Pin 13) | 10k pull-up on A-side |
+| MCU_SD_D0..D3 | SDIO data 0-3 to Mux B0 | IO10..IO7 (Pins 12..9) | 10k pull-ups on A-side; D3=CS in 1-bit/SPI fallback |
+| SD_SEL | storage ownership select | IO23 (Pin 21) | drives U6 SEL; high=bridge owns (USB plugged), low=radio owns |{det}{emmc_extra}
 
 ## I2C (fuel gauge U4 + charger U3)
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
-| I2C_SDA | I2C data | free GPIO | 4.7k pull-up; shared with BQ25896 SDA |
-| I2C_SCL | I2C clock | free GPIO | 4.7k pull-up; shared with BQ25896 SCL |
-| GAUGE_ALRT | low-battery interrupt | free GPIO | from MAX17048 ALRT (open-drain) |
-| CHG_INT | charger interrupt | free GPIO | from BQ25896 INT (open-drain) |
+| I2C_SDA | I2C data | IO4 (Pin 17) | 4.7k pull-up; shared with BQ25896 SDA |
+| I2C_SCL | I2C clock | IO5 (Pin 16) | 4.7k pull-up; shared with BQ25896 SCL |
+| GAUGE_ALRT | low-battery interrupt | IO6 (Pin 8) | from MAX17048 ALRT (open-drain) |
+| CHG_INT | charger interrupt | IO25 (Pin 26) | from BQ25896 INT (open-drain). *Mapped to AGG_CLK on Dual variants.* |
 
 ## UI + charger status
 | Signal | Function | Pin | Notes |
 |---|---|---|---|
-| BTN | tactile button | free GPIO | 10k pull-up + firmware debounce; press patterns = pair / factory-reset |
-| LED_DIN | WS2812 data | free GPIO | single addressable RGB |
-| CHG_STAT | charger status | free GPIO | from BQ25896 STAT (open-drain) |
+| BTN | tactile button | IO0 (Pin 6) | 10k pull-up + firmware debounce; press patterns = pair / factory-reset |
+| LED_DIN | WS2812 data | IO2 (Pin 4) | single addressable RGB |
+| CHG_STAT | charger status | IO3 (Pin 5) | from BQ25896 STAT (open-drain) |
 {dual}
 ## Routing note
-Wi-Fi {'6E' if v.is_e22 else '5 GHz'} TX bursts are the current peak. Wide copper on VBUS/VBAT/3V3, bulk +
+Wi-Fi {'6E' if v.is_e22 else '5 GHz'} TX bursts are the current peak. Wide copper on VBUS/VBAT/VSYS/3V3, bulk +
 decoupling close to U1 (and U1B on dual), and size U5 for the peak, not the
 average — this prevents mid-transfer brownout resets.
 """
@@ -636,15 +702,15 @@ def emit_schematic_plan(v: Variant, nets: dict) -> str:
              f"Variant: **{RADIOS[v.radio]['label']}**, **{STORAGE[v.storage]['label']}**, **{FORM_FACTORS[v.form_factor]['label']}**.",
              "",
              "## Power tree",
-             "`VBUS` (USB-C) -> U3 charge in; `VBAT` (BT1 <-> U3 VBAT <-> U4 CELL <-> U5 VIN);",
-             "`+3V3` (U5 VOUT -> U1" + ("/U1B" if v.is_dual else "") + ", U2, U4, U6, storage, LED, pull-ups).",
+             "`VBUS` (USB-C) -> U3 charge in; `VBAT` (BT1 <-> U3 VBAT <-> U4 CELL);",
+             "`VSYS` (U3 SYS -> U5 VIN); `+3V3` (U5 SW(LX) -> U1" + ("/U1B" if v.is_dual else "") + ", U2, U4, U6, storage, LED, pull-ups).",
              "Common `GND` pour, stitched.",
              "",
-             "## Storage ownership (the shared-bus trick)",
-             "Storage SD_* lines connect to the **common** side of U6. U1 SDIO connects",
-             "to U6 A-side; U2 (USB-HS bridge) connects to U6 B-side. `SD_SEL` (driven by",
-             "VBUS-present detection in firmware/hardware) selects the owner: plugged in =",
-             "bridge owns (fast wired ~70-100+ MB/s); otherwise radio owns (wireless). Never both.",
+             "## Storage ownership (the shared-bus trick via TXS02612)",
+             "Storage SD_* lines connect to the **A-side** of U6. U1 SDIO connects",
+             "to U6 **B0-side** (MCU_SD_* nets); U2 (USB-HS bridge) connects to U6 **B1-side** (BRG_SD_* nets).",
+             "`SD_SEL` (driven by VBUS-present detection in firmware/hardware) selects the owner: plugged in =",
+             "bridge owns (B1 active, fast wired ~70-100+ MB/s); otherwise radio owns (B0 active, wireless). Never both.",
              "",
              "## All nets (signal -> nodes)",
              "",
@@ -1171,11 +1237,11 @@ def emit_tmux1574_schematic_plan(v: Variant) -> str:
 
 This is the **TMUX1574 (Signal Integrity Upgrade)** alternative build path for the SD bus mux.
 
-## Key Differences from Standard (TS3A-class)
-- **U6:** TMUX1574 (QFN-24) instead of TS3A-class (QFN-20).
+## Key Differences from Standard (TXS02612)
+- **U6:** TMUX1574 (QFN-24) instead of TXS02612 (WQFN-24).
 - **Performance:** Higher bandwidth, lower on-resistance (Ron). Better signal integrity for SDIO at higher clock rates.
-- **Pin Count:** 24 pins vs 20. Additional pins for control/NC.
-- **Use Case:** Recommended if SDIO timing issues are observed with the TS3A-class mux on prototype.
+- **Pin Count:** 24 pins vs 25 (no center pad). Additional pins for control/NC.
+- **Use Case:** Recommended if SDIO timing issues are observed with the TXS02612 mux on prototype.
 
 ## Net Changes
 - **SEL:** Same function (SD_SEL).
@@ -1363,7 +1429,7 @@ def validate(root: str) -> None:
             if body.count("(node") < 2:
                 problems.append(f"{v.name}: net {name} has <2 nodes")
         # GND and 3V3 present
-        for required in ["GND", "3V3", "VBUS", "VBAT", "SD_CLK", "USB_DP"]:
+        for required in ["GND", "3V3", "VBUS", "VBAT", "VSYS", "SD_CLK", "MCU_SD_CLK", "BRG_SD_CLK", "USB_DP"]:
             if f'(name "{required}")' not in txt:
                 problems.append(f"{v.name}: missing net {required}")
         # dual has aggregation crossover nets (SPI)

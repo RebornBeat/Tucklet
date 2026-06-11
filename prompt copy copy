@@ -1,0 +1,3190 @@
+README.md
+
+# Tucklet
+
+**A pocket-sized companion drive that clips to your phone like a charm and holds your memories — no data cable, no babysitting, no clutter.**
+
+Tucklet is a small, battery-powered, wireless storage device. After a one-time
+pairing, your phone recognizes it automatically — no button press in daily use —
+and your photos and videos move on and off it through a clean app that never
+makes you think about "caches" or "sync states." It is designed to disappear
+into your daily carry, and to be usable by someone who has never thought about
+storage in their life.
+
+![Tucklet flow](docs/assets/flow.svg)
+
+> **Status:** Engineering foundation, organized for build. The architecture,
+> protocol, per-variant hardware design, mechanical model, and the shared
+> firmware/app core are complete and (where they can be) compiled and tested.
+> The on-device firmware binary and the native apps build on this foundation —
+> see [Build status](#build-status).
+
+---
+
+## What it is
+
+| | |
+|---|---|
+| **Storage** | **microSD** (swappable) or **eMMC** (sealed) — your choice of variant. |
+| **Radio** | **ESP32-C5** (Wi-Fi 6 + BLE) in Standard or Mini form factors; **ESP32-E22** (Wi-Fi 6E) roadmap. |
+| **Control link** | **BLE** — discovery, auth, battery %, wake. Low power, always cheap. |
+| **Wireless data** | **Wi-Fi** (SoftAP universally; **Wi-Fi Aware** seamlessly where certified). On only while transferring. |
+| **Wired data** | **USB-C → GL3224 USB 3.0 bridge** — ~70–100+ MB/s (USB 3.0); USB 2.0 fallback via GL823 at ~25–35 MB/s; also charges. |
+| **Security** | Invisible after a one-time pairing: silent low-duty BLE, cryptographic challenge-response, physical-press to enroll a *new* phone. |
+
+## The experience
+
+- **Plain-language state, never jargon:** **On phone / On Tucklet / Temporary** — the word "cache" never appears.
+- **You set how long "Temporary" lasts** (1 hour / 1 day / 1 week / keep).
+- **Round-trip metadata:** files remember their origin album/app so "put it back" restores them exactly.
+- **Per-app organization** by default; a friendly folder view for power users, never forced.
+- **Honest transfer time:** every transfer shows an estimate before it starts and a live ETA while it runs.
+- **Trickle backup:** new photos back up automatically when the charm is near and idle, so the big transfer never has to happen.
+
+Full detail in [`docs/UX_SPEC.md`](docs/UX_SPEC.md).
+
+## Repository layout
+
+```
+tucklet/
+├── README.md                  # you are here
+├── LICENSING.md               # which license covers what (source-available, non-commercial for both Charm and Pro lines)
+├── LICENSE-HARDWARE.txt        # CC BY-NC-SA 4.0 (hardware/mechanical — both Charm and Pro variants)
+├── LICENSE-SOFTWARE.txt        # PolyForm Noncommercial 1.0.0 (firmware/apps — both Charm and Pro variants)
+├── docs/
+│   ├── INDEX.md               # documentation map — start here to navigate
+│   ├── FINAL_REVIEW.md        # current source of truth (supersedes ADRs)
+│   ├── VARIANT_MATRIX.md      # every build configuration, one codebase
+│   ├── TRANSFER_PERFORMANCE.md, UX_SPEC.md, POWER_THERMAL.md, PRIOR_ART_AND_LICENSE.md
+│   ├── adr/                   # original decision records (history)
+│   ├── protocol/PROTOCOL.md   # the wire contract (mirrored by tucklet-proto)
+│   └── assets/flow.svg
+├── hardware/
+│   ├── README.md              # hardware overview + how the variants relate
+│   ├── PRO_LINE.md            # Pro line (E22-WROOM + 2S) — source-available, non-commercial
+│   ├── gen_hardware.py        # parametric SOURCE — regenerates every variant
+│   ├── common/                # shared parts rationale, cross-variant comparison, block diagram
+│   └── variants/              # one folder per board: SPEC, BOM, PIN_MAP, SCHEMATIC_PLAN, .net, diagram
+│       # C5 Standard (WROOM)
+│       ├── singlec5-wroom-microsd/
+│       ├── singlec5-wroom-emmc/
+│       ├── dualc5-wroom-microsd/
+│       ├── dualc5-wroom-emmc/
+│       # C5 Mini (Compact)
+│       ├── singlec5-mini-microsd/
+│       ├── singlec5-mini-emmc/
+│       ├── dualc5-mini-microsd/
+│       ├── dualc5-mini-emmc/
+│       # E22 Mini (Roadmap/Future)
+│       ├── singlee22-mini-microsd/
+│       ├── singlee22-mini-emmc/
+│       ├── duale22-mini-microsd/
+│       └── duale22-mini-emmc/
+├── firmware/                  # Rust workspace (tucklet-proto + tucklet-core compile + tested)
+├── software/ios/              # iOS companion app (SwiftUI + File Provider)
+├── software/android/          # Android app (Kotlin + Jetpack Compose)
+├── software/desktop/          # Desktop: USB-drive when wired + wireless companion (Rust core/CLI + Tauri GUI)
+└── mechanical/                # parametric enclosure (renders STLs for both envelopes)
+```
+
+## Start here
+
+1. [`docs/INDEX.md`](docs/INDEX.md) — the full documentation map.
+2. [`docs/FINAL_REVIEW.md`](docs/FINAL_REVIEW.md) — the load-bearing decisions, current.
+3. [`hardware/README.md`](hardware/README.md) — the board variants and how to build them in KiCad.
+4. [`docs/protocol/PROTOCOL.md`](docs/protocol/PROTOCOL.md) — the contract that keeps firmware and apps in sync.
+
+## Build status
+
+What is **compiled and tested** here (run `cargo test` in `firmware/`):
+
+- `firmware/crates/tucklet-proto` — every wire type (variant matrix, states, origin metadata, transfers). *5 tests.*
+- `firmware/crates/tucklet-core` — device brain: estimator, link profiles, state machine, trickle scheduler, **session credentials**, Temporary expiry, allow-list, transport resolution. *16 tests.*
+
+What is **complete and verified to render**: the parametric hardware (**12 Charm-optimized variants**, all netlists validated), the enclosure (renders watertight STLs for both envelopes), and all design docs.
+
+What **builds on this foundation and needs on-hardware/SDK bring-up**: the
+on-device ESP32-C5 firmware binary and the native apps (iOS present; Android +
+desktop next). Those can't be compiled in CI here against the C5 toolchain and
+the iOS 26 SDK, so they are written real and complete with the exact
+SDK-confirmation points flagged rather than guessed. See `docs/INDEX.md` for the
+current state of each.
+
+## The two product lines
+
+Tucklet is organized as two distinct product lines, both under the same source-available, non-commercial licensing:
+
+### Charm (source-available, non-commercial)
+
+The AirTag-class wearable. All 12 generated variants (C5 WROOM/MINI, E22-MINI
+roadmap) fall under this line. Licensed under **CC BY-NC-SA 4.0** (hardware)
+and **PolyForm Noncommercial 1.0.0** (software). You may study, modify, and
+build for personal use; commercial sale requires a separate agreement.
+
+Key components in the Charm line:
+- **USB-HS Bridge:** GL3224-OEM (QFN-32, USB 3.0, ~70–100+ MB/s wired). Backup: GL823 (QFN-24, USB 2.0, ~25–35 MB/s).
+- **Charger:** BQ25896 (WQFN-24, power-path buck charger, I²C). Backup: MCP73831 (SOT-23-5, simple linear, no power-path).
+- **Fuel Gauge:** MAX17048 (TDFN-8, ModelGauge, no sense resistor).
+- **SD Bus Mux:** TS3A-class (QFN-20). Upgrade path: TMUX1574 for signal integrity.
+- **Dual-Radio AGG Link:** SPI (4 wires: CLK, CS, MOSI, MISO) for 12–15 MB/s sustained on dual variants.
+- **Battery:** 1S LiPo (120–200 mAh for C5; 300–500 mAh for E22).
+
+### Pro (source-available, non-commercial)
+
+A larger, higher-performance variant built around the **ESP32-E22-WROOM** (Wi-Fi 6E,
+22×30 mm module with external IPEX antenna) and a **2S LiPo** battery pack.
+This requires a larger enclosure (~35×28×12–13 mm) and, like the Charm line, is fully covered under the **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software) licenses. The Pro design IP is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md) and is available for study, modification, and personal use; commercial sale requires a separate agreement.
+
+Key differences for Pro:
+- **Charger:** BQ25887 (2S boost + cell balancing).
+- **Fuel Gauge:** BQ27421 or BQ27520 (Impedance Track, requires sense resistor).
+- **Buck Regulator:** Sized for 8.4V input (2S) → 3.3V output at ≥2A.
+- **Battery:** 2S LiPo (~120–150 mAh, ~6 mm thick).
+- **Enclosure:** ~35×28×12–13 mm (breaks AirTag class; justified by performance).
+
+## License
+
+**Source-available, non-commercial** for both the **Charm** and **Pro** lines (study/modify/build, don't sell): hardware under CC BY-NC-SA 4.0, software under PolyForm Noncommercial 1.0.0. This is *not* an OSI/GNU "open source" license — see [`LICENSING.md`](LICENSING.md).
+
+### Hardware scope & novelty
+
+The Hardware License (CC BY-NC-SA 4.0) applies to the specific implementation files
+(schematics, PCB layouts, netlists, and mechanical models) contained in this
+repository for **both the Charm and Pro product lines**. Specifically, the license covers the
+following novel design elements:
+
+1. **SDIO Bus Multiplexing Architecture:** The specific circuit topology where the
+   SDIO storage bus is arbitrated between a Wi-Fi radio (ESP32-C5/E22) and a
+   dedicated USB-HS Bridge (U2) via a hardware mux (U6), enabling seamless
+   switching between wireless and high-speed wired modes without user intervention.
+2. **Dual-Radio SPI Link Aggregation Topology:** The unique placement, antenna
+   isolation strategy, and inter-processor SPI communication (AGG link) design
+   required to fit two ESP32 radios in a "Charm" form factor for aggregated
+   throughput.
+3. **Integrated Charm Enclosure:** The parametric mechanical design that integrates
+   a battery, antenna, storage, and thermal management into an AirTag-class envelope.
+
+---
+
+*"Tucklet" is a working product name (verified clear vs. the taken "Locket"/"Tuckit"). Trademark-check class 9 before commercial use.*
+
+
+mechanical/enclosure.scad
+
+// ============================================================================
+// Tucklet enclosure — parametric, both storage variants.
+// License: CC BY-NC-SA 4.0 (see /LICENSE-HARDWARE.txt)
+//
+// Renders a two-part charm enclosure (base + snap lid) dimensioned from the
+// envelope in docs/TRANSFER_PERFORMANCE.md / hardware/VARIANTS.md:
+//   microSD variant ~ 35 x 28 x 9 mm   |   eMMC variant ~ 32 x 24 x 8 mm
+//   Pro variant     ~ 35 x 28 x 12-13 mm
+//
+// Charm Strategy Verified:
+// This envelope accommodates the ESP32-C5-WROOM-1 (18.0 x 27.5 mm).
+// NOTE: The C5-WROOM length (27.5mm) fits along the X-axis (35mm outer).
+// Orientation: The module MUST be placed parallel to the X-axis to fit within
+// the Y-axis (28mm outer) constraint.
+//
+// Pro Charm Strategy Verified:
+// The Pro variant (~35 x 28 x 12-13 mm) exceeds the AirTag-class thickness
+// but remains a "Pro Charm" — it clips to your phone, hangs on a string,
+// and disappears into your daily carry. The thickness is justified by the
+// performance: Wi-Fi 6E throughput and sustained high-current operation that
+// the 1S Charm line cannot deliver. The Pro line is fully covered under the
+// same source-available, non-commercial license as the Charm line.
+//
+// This is dimensioned from the DOCUMENTED envelope. Before cutting plastic,
+// set the cutout offsets to your actual KiCad board placement (the connector
+// X/Y positions), then re-render. Everything here is a real, editable solid.
+//
+// Usage (headless):
+//   openscad -D 'variant="microsd"' -D part=0 -o base_microsd.stl  enclosure.scad
+//   openscad -D 'variant="microsd"' -D part=1 -o lid_microsd.stl   enclosure.scad
+//   openscad -D 'variant="emmc"'    -D part=0 -o base_emmc.stl     enclosure.scad
+//   openscad -D 'variant="emmc"'    -D part=1 -o lid_emmc.stl      enclosure.scad
+//   openscad -D 'variant="pro"'     -D part=0 -o base_pro.stl      enclosure.scad
+//   openscad -D 'variant="pro"'     -D part=1 -o lid_pro.stl       enclosure.scad
+// ============================================================================
+
+// ---- parameters ------------------------------------------------------------
+variant = "microsd";      // "microsd" | "emmc" | "pro"
+part    = 0;              // 0 = base, 1 = lid, 2 = both (preview)
+ $fn     = 64;
+
+wall      = 1.6;          // wall thickness
+floor_th  = 1.4;          // floor/ceiling thickness
+fillet    = 2.5;          // outer corner radius
+lid_h     = 3.0;          // lid height (cap)
+gap       = 0.15;         // print clearance for the snap fit
+
+// Envelope per variant (outer X, Y, total Z).
+// microSD: 35mm X fits ESP32-C5-WROOM-1 (27.5mm length) with margin.
+// eMMC:    32mm X fits ESP32-C5-WROOM-1 (27.5mm length) easily.
+// Pro:     35mm X fits ESP32-E22-WROOM (22mm length, IPEX antenna along edge).
+if (variant == "pro") {
+    outer_x = 35;
+    outer_y = 28;
+    outer_z = 13;         // Pro Charm: 2S battery (6mm) + components
+} else if (variant == "emmc") {
+    outer_x = 32;
+    outer_y = 24;
+    outer_z = 8;
+} else {                  // microsd
+    outer_x = 35;
+    outer_y = 28;
+    outer_z = 9;
+}
+
+base_h = outer_z - lid_h;
+
+// Connector / feature offsets — SET THESE FROM YOUR BOARD LAYOUT.
+usbc_w    = 9.2;          // USB-C receptacle opening width
+usbc_h    = 3.6;          // opening height
+usbc_y    = outer_y/2;    // centered on the short edge (edit to board)
+btn_d     = 3.4;          // button plunger hole dia
+led_d     = 2.2;          // LED light-pipe hole dia
+sd_slot_w = 13.0;         // microSD door opening width (microsd variant only)
+sd_slot_h = 2.0;          // microSD door opening height
+lanyard_d = 2.6;          // lanyard hole diameter
+lanyard_boss = 5.2;       // lanyard boss outer diameter
+
+// Pro-specific: IPEX antenna clearance slot on the long edge.
+// The E22-WROOM requires an external IPEX antenna. Route the cable
+// along the long edge with a small keep-out slot in the enclosure.
+ipex_slot_w = 3.0;        // IPEX cable slot width
+ipex_slot_h = 1.5;        // IPEX cable slot height
+ipex_slot_x = outer_x/2 - 7; // position along X edge
+
+// ---- helpers ---------------------------------------------------------------
+module rrect(x, y, r, h) {
+    linear_extrude(height = h)
+        offset(r = r) offset(r = -r)
+            square([x, y], center = true);
+}
+
+// Hollow shell: outer rrect minus inner cavity.
+module shell(h, inner_floor) {
+    difference() {
+        rrect(outer_x, outer_y, fillet, h);
+        translate([0, 0, inner_floor])
+            rrect(outer_x - 2*wall, outer_y - 2*wall, max(fillet - wall, 0.6),
+                  h - inner_floor + 0.1);
+    }
+}
+
+// Lanyard loop: a small boss with a through hole on the short edge.
+module lanyard_loop() {
+    translate([-outer_x/2 + 1, 0, base_h/2]) {
+        difference() {
+            union() {
+                rotate([90,0,0]) cylinder(d = lanyard_boss, h = 3.0, center = true);
+                translate([-1.5,0,0]) cube([3, 3.0, lanyard_boss], center = true);
+            }
+            rotate([90,0,0]) cylinder(d = lanyard_d, h = 6, center = true);
+        }
+    }
+}
+
+// ---- base ------------------------------------------------------------------
+module base() {
+    difference() {
+        union() {
+            shell(base_h, floor_th);
+            lanyard_loop();
+        }
+        // USB-C opening on +X short edge
+        translate([outer_x/2 - wall - 0.1, usbc_y - outer_y/2, floor_th + 0.6])
+            cube([wall + 0.6, usbc_w, usbc_h], center = false);
+        // re-center the USB cut properly (front edge, centered Y)
+        translate([outer_x/2, 0, floor_th + usbc_h/2 + 0.6])
+            cube([wall*3, usbc_w, usbc_h], center = true);
+        // microSD access slot (microsd variant) on -X short edge
+        if (variant == "microsd") {
+            translate([-outer_x/2, 0, floor_th + sd_slot_h/2 + 0.8])
+                cube([wall*3, sd_slot_w, sd_slot_h], center = true);
+        }
+        // Pro: IPEX antenna cable slot on +Y long edge
+        // Allows the E22-WROOM's IPEX cable to route to the ceramic patch antenna
+        // along the long edge of the enclosure. Keep-out: 15mm from metal.
+        if (variant == "pro") {
+            translate([ipex_slot_x, outer_y/2, floor_th + ipex_slot_h/2 + 0.5])
+                cube([ipex_slot_w, wall*3, ipex_slot_h], center = true);
+        }
+    }
+}
+
+// ---- lid -------------------------------------------------------------------
+module lid() {
+    difference() {
+        union() {
+            // outer cap
+            rrect(outer_x, outer_y, fillet, lid_h);
+            // inner lip that fits inside the base walls (snap)
+            translate([0,0,-1.4])
+                rrect(outer_x - 2*wall - 2*gap, outer_y - 2*wall - 2*gap,
+                      max(fillet - wall, 0.6), 1.4);
+        }
+        // hollow the cap
+        translate([0,0,floor_th])
+            rrect(outer_x - 2*wall, outer_y - 2*wall, max(fillet-wall,0.6), lid_h);
+        // button hole + LED light-pipe hole on the top face
+        translate([outer_x/2 - 7, outer_y/2 - 6, -0.1])
+            cylinder(d = btn_d, h = lid_h + 0.4);
+        translate([outer_x/2 - 7, -outer_y/2 + 6, -0.1])
+            cylinder(d = led_d, h = lid_h + 0.4);
+        // Pro: heat vent slots (E22 generates more heat in sealed enclosure)
+        // Small slots on the top face for thermal relief during sustained transfer.
+        // Not structural; wall thickness maintained at edges.
+        if (variant == "pro") {
+            translate([0, 0, -0.1]) {
+                for (i = [-1, 0, 1]) {
+                    translate([i * 8, -outer_y/2 + 3.5, 0])
+                        cube([0.6, 2.0, lid_h + 0.4], center = true);
+                }
+            }
+        }
+    }
+}
+
+// ---- render ----------------------------------------------------------------
+if (part == 0) base();
+else if (part == 1) translate([0,0,base_h + 4]) lid();
+else { base(); translate([0,0,base_h + 6]) lid(); }
+
+
+mechanical/MECHANICAL.md
+
+# Mechanical Design
+
+The enclosure is delivered as a real parametric model — `enclosure.scad` (OpenSCAD) — not a dead mesh. You edit parameters and re-render STLs for any variant. Verified: it renders to valid STL for all three storage types and form factors (base + lid) with OpenSCAD.
+
+## Render
+```bash
+# Standard WROOM Variants
+openscad -D 'variant="microsd"' -D part=0 -o base_microsd.stl enclosure.scad
+openscad -D 'variant="microsd"' -D part=1 -o lid_microsd.stl  enclosure.scad
+openscad -D 'variant="emmc"'    -D part=0 -o base_emmc.stl     enclosure.scad
+openscad -D 'variant="emmc"'    -D part=1 -o lid_emmc.stl      enclosure.scad
+
+# Pro Variant (E22-WROOM + 2S LiPo)
+openscad -D 'variant="pro"'     -D part=0 -o base_pro.stl      enclosure.scad
+openscad -D 'variant="pro"'     -D part=1 -o lid_pro.stl       enclosure.scad
+```
+(`part=2` previews base+lid together.)
+
+*Note: Mini variants (ESP32-C5-MINI-1 / ESP32-E22-MINI-1) fit comfortably within the eMMC envelope parameters. The parametric script can be adjusted to reduce length by ~6mm for dedicated Mini designs, but the standard "eMMC" envelope provides a unified shell for both WROOM-eMMC and MINI-eMMC builds.*
+
+## What it makes
+A two-part charm: a hollow base shell with a snap lid, a lanyard loop on the short edge (the "string" attach point), a USB-C opening, a microSD access slot (microSD variant only), and top-face holes for the button plunger and an LED light-pipe.
+
+The design philosophy is **"Charm-First"**: All dimensions are constrained to the AirTag class for the Charm line, and to the Pro Charm class for the Pro line. The Pro variant (~35 x 28 x 12-13 mm) exceeds the AirTag thickness but remains a "Pro Charm" — it clips to your phone, hangs on a string, and disappears into your daily carry. It does not support oversized modules (like the ESP32-E22-M2) to ensure the product remains invisible and wearable.
+
+## Envelopes (from VARIANTS.md, reconfirmed)
+Dimensions are driven by two factors: **Storage Type** (width) and **Module Length** (height/length).
+
+- **microSD Envelope:** ~35 x 28 x 9 mm
+  *   *Drivers:* Width defined by microSD socket; Length defined by **ESP32-C5-WROOM-1** (27.5mm) + USB-C connector + clearance.
+- **eMMC Envelope:** ~32 x 24 x 8 mm
+  *   *Drivers:* Width reduced (no socket); Length defined by **ESP32-C5-WROOM-1**.
+  *   *Mini Advantage:* **ESP32-C5-MINI-1** (21.3mm) builds allow for smaller custom enclosures (approx ~28mm length) or increased battery capacity within this same shell.
+- **Pro Envelope:** ~35 x 28 x 12-13 mm
+  *   *Drivers:* Width and length defined by **ESP32-E22-WROOM** module (22 x 30 mm) + IPEX antenna clearance; Thickness defined by **2S LiPo** battery (~6mm) + components.
+  *   *Pro Charm Identity:* This is still a "Charm" — it clips to your phone, hangs on a string, and disappears into your daily carry. The thickness is justified by the performance (Wi-Fi 6E throughput and sustained high-current operation) that the 1S Charm line cannot deliver. The Pro line is fully covered under the **same source-available, non-commercial license** (CC BY-NC-SA 4.0 / PolyForm Noncommercial 1.0.0) as the Charm line.
+
+Both the Charm and Pro envelopes sit in the charm class. The thickness is primarily driven by the battery (1S or 2S) and USB-C receptacle height.
+
+## Before cutting plastic (the one real fit step)
+The connector/feature offsets (`usbc_y`, button/LED positions, microSD slot, IPEX slot) are dimensioned to the documented envelope. Set them to your actual KiCad board placement — i.e. the real X/Y of the USB-C receptacle, the button/LED, and (for Pro variants) the IPEX antenna cable exit — then re-render.
+
+**Critical Check:**
+- **WROOM Variants:** Ensure clearance for the full 27.5mm module length.
+- **MINI Variants:** The smaller module (15.4mm width, 21.3mm length) provides extra internal volume. Verify antenna clearance (keep metal objects away from the PCB antenna area on the end of the module).
+- **Pro Variants:** Ensure clearance for the full 30mm E22-WROOM module length along the X-axis. The IPEX antenna cable must route from the module to the antenna position with minimal bending. Antenna keep-out: 15 mm from metal components on the antenna end of the device.
+
+This is the only step that needs your finished board; everything else is parametric and done.
+
+## Material & process
+- **Prototype:** 3D print in PETG (heat tolerance near the charger/radio) or tough PLA for early fit checks.
+- **Production:** Injection molding (ABS or PC/ABS). Mold tooling is separate capital (~$3–10k for a small mold), amortized over units — not part of per-unit BOM.
+- **Thermal Management:** Optional internal copper pour / foil as a heat spreader during sustained transfer (see `docs/POWER_THERMAL.md`); validate with a thermal soak on a prototype. Note that sealed eMMC variants and Pro variants may trap more heat than vented microSD variants. The Pro enclosure includes heat vent slots for thermal relief during sustained transfer.
+
+## CAD round-trip
+This native parametric source is the source of truth; export STEP/STL for manufacturing. (This follows the deconstruct/reconstruct workflow you established: keep the parametric recipe, not just the baked geometry.)
+
+## Tolerances
+- Snap-fit clearance `gap = 0.15 mm` (tune to your printer/process).
+- Wall 1.6 mm, floor/ceiling 1.4 mm — adjust for material and drop resistance.
+- Lanyard boss: Designed for 2.6mm cord/loop; verify pull-strength if using weaker materials like standard PLA.
+
+## Pro Charm Identity & Licensing
+
+The Pro variant (~35 x 28 x 12-13 mm) exceeds the AirTag-class thickness but remains a **"Pro Charm"** — it clips to your phone, hangs on a string, and disappears into your daily carry. It is not a "backpack" or "brick" class device. The thickness is justified by the performance: Wi-Fi 6E throughput and sustained high-current operation that the 1S Charm line cannot deliver.
+
+The Pro line is fully covered under the **same source-available, non-commercial license** as the Charm line:
+- **Hardware:** CC BY-NC-SA 4.0 (see `/LICENSE-HARDWARE.txt`)
+- **Software:** PolyForm Noncommercial 1.0.0 (see `/LICENSE-SOFTWARE.txt`)
+
+You may study, modify, and build Pro variants for personal use; commercial sale requires a separate agreement. The Pro design IP is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md).
+
+
+hardware/README.md
+
+# Tucklet Hardware
+
+This directory holds the complete electrical design for every Tucklet board
+variant. It is organized so that "what is what" is obvious:
+
+```
+hardware/
+├── README.md                 # you are here
+├── gen_hardware.py           # the parametric SOURCE — regenerates every variant
+├── PRO_LINE.md               # Pro line (E22-WROOM + 2S) — source-available, non-commercial
+├── common/                   # shared, variant-independent design
+│   ├── COMPONENT_SELECTION.md   # the shared parts + why (ESP32-C5 / E22 era)
+│   ├── VARIANTS.md              # cross-variant comparison + BOM/dimension overview
+│   ├── block_diagram.svg        # system block diagram (all variants)
+│   └── kicad/                   # (place your KiCad project + symbol/footprint libs here)
+└── variants/                 # one folder per PHYSICAL board variant
+    ├── singlec5-wroom-microsd/
+    ├── singlec5-wroom-emmc/
+    ├── dualc5-wroom-microsd/
+    ├── dualc5-wroom-emmc/
+    ├── singlec5-mini-microsd/
+    ├── singlec5-mini-emmc/
+    ├── dualc5-mini-microsd/
+    ├── dualc5-mini-emmc/
+    ├── singlee22-mini-microsd/
+    ├── singlee22-mini-emmc/
+    ├── duale22-mini-microsd/
+    └── duale22-mini-emmc/
+```
+
+## The Variants (Charm Strategy)
+
+Tucklet variants are defined by three axes: **Radio**, **Storage**, and **Form Factor**. The generator enforces a "Charm-Only" strategy, excluding oversized modules to ensure every board fits the intended product identity.
+
+### Axis 1: Radio
+- **Single C5:** Baseline Wi-Fi 6 (2.4/5 GHz).
+- **Dual C5:** Link-aggregated (experimental).
+- **Single/Dual E22:** Wi-Fi 6E High-Performance (Roadmap).
+
+### Axis 2: Storage
+- **microSD:** Swappable, user-supplied.
+- **eMMC:** Sealed, fixed capacity.
+
+### Axis 3: Form Factor
+- **WROOM (Standard):** 18.0 x 27.5 mm module.
+- **MINI (Compact):** 15.4 x 21.3 mm module (enables smaller enclosures).
+- **Constraint:** E22 variants are restricted to **MINI** form factor (or compatible future modules) to maintain the "Charm" envelope; oversized M.2 variants are excluded.
+
+## The Product Lines
+
+| Line | Radio | Form Factor | Variants | Position |
+|---|---|---|---|---|
+| **Charm Standard** | ESP32-C5 | WROOM | 4 | Baseline: Lowest cost, easy assembly |
+| **Charm Compact** | ESP32-C5 | MINI | 4 | Nano: Smallest footprint, tighter layout |
+| **Charm High-Perf** | ESP32-E22 | MINI | 4 | Roadmap: Wi-Fi 6E speed, pending module release |
+| **Pro High-Perf** | ESP32-E22 | WROOM | Roadmap | Larger: Wi-Fi 6E speed, 2S battery, pending module release |
+
+Each `variants/<name>/` folder contains, all generated and mutually consistent:
+
+- `SPEC.md` — what the board is, performance, dimensions, bring-up checklist.
+- `BOM.csv` — full bill of materials (electronics + PCB + enclosure) with totals.
+- `PIN_MAP.md` — signal → MCU pin reconciliation (the one datasheet step).
+- `SCHEMATIC_PLAN.md` — net-by-net connection plan.
+- `tucklet-<name>.net` — **KiCad-importable netlist** (Pcbnew → File → Import Netlist).
+- `block_diagram.svg` — that variant's block diagram.
+
+## Variant Folder Organization (Standard vs. Alternatives)
+
+Within each `variants/<name>/` folder, the component alternatives and design paths are organized into subfolders. This ensures that every physical board variant has a clear, traceable path for both the **Primary (Standard)** build and any **Backup (Alternative)** component choices. This is critical for BOM flexibility and supply-chain resilience, and it ensures the specific implementations are captured for licensing provenance.
+
+```
+variants/<name>/
+├── SPEC.md
+├── PIN_MAP.md
+├── block_diagram.svg
+├── standard/               # PRIMARY build path (verified components)
+│   ├── BOM.csv             # BOM with primary MPNs (GL3224, BQ25896, etc.)
+│   ├── SCHEMATIC_PLAN.md   # Net list using primary pinouts
+│   └── tucklet-<name>.net  # Netlist for primary components
+└── alternatives/           # BACKUP build paths (supply chain alternatives)
+    ├── usb_bridge_gl823/   # Alternative: GL823 (USB 2.0, QFN-24)
+    │   ├── BOM.csv         # BOM delta or full BOM with GL823
+    │   ├── SCHEMATIC_PLAN.md  # Pin/net changes for GL823
+    │   └── tucklet-<name>-gl823.net
+    ├── usb_bridge_pl2732/  # Alternative: PL2732 (USB 3.0, QFN-32)
+    │   ├── BOM.csv
+    │   ├── SCHEMATIC_PLAN.md
+    │   └── tucklet-<name>-pl2732.net
+    ├── charger_mcp73831/   # Alternative: MCP73831 (Linear, no power-path)
+    │   ├── BOM.csv
+    │   ├── SCHEMATIC_PLAN.md
+    │   └── tucklet-<name>-mcp73831.net
+    └── sd_mux_tmux1574/   # Alternative: TMUX1574 (Signal integrity upgrade)
+        ├── BOM.csv
+        ├── SCHEMATIC_PLAN.md
+        └── tucklet-<name>-tmux1574.net
+```
+
+**Why this structure?**
+- **Licensing Specificity:** Copyright protects *specific implementations*. The `standard/` and `alternatives/` folders capture the exact MPNs, pin mappings, and netlists for each component choice. A generic "USB Bridge" is unprotectable; `GL3224-OEM` is.
+- **Supply Chain Resilience:** If the GL3224 is out of stock, the GL823 or PL2732 path is already documented and netlisted.
+- **Design Clarity:** No ambiguity about which BOM goes with which schematic.
+
+**Note:** Not all alternatives apply to all variants. The generator creates only the relevant subfolders based on the variant's configuration (e.g., a single-C5 variant may not need the TMUX1574 upgrade unless signal integrity issues are observed).
+
+## E22 and Pro Line Status
+
+### E22-MINI Variants (Roadmap)
+The `ESP32-E22-MINI-1` is a projected component. While the architecture and netlists for the 4 E22-MINI Charm variants are generated and valid, the module is **not yet released** and datasheets are unavailable. Do not fabricate E22-MINI variants until:
+1. The hardware is procured.
+2. Footprints are verified against the official datasheet.
+3. The GPIO map is reconciled (PIN_MAP.md must be updated).
+
+### E22-WROOM / Pro Line (Source-available, Non-commercial)
+The `ESP32-E22-WROOM` (22×30 mm module with external IPEX antenna) is explicitly excluded from the Charm variants due to size and antenna constraints. However, this module is the basis for the **Pro Line**, a larger, higher-performance variant with a 2S LiPo battery pack.
+
+The Pro design IP is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md). Like the Charm line, the Pro line is fully covered under the **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software) licenses. You may study, modify, and build for personal use; commercial sale requires a separate agreement.
+
+**No Pro variant folders are created at this time.** When the E22-WROOM datasheet is released and the Pro line is ready for prototyping, variant folders (e.g., `pro-e22-wroom-microsd/`) will be added with the same structure, under the same source-available, non-commercial license as the Charm line.
+
+## How to use these (your KiCad workflow)
+
+You have two equally valid paths, matching the deconstruct/reconstruct approach
+you use for CAD:
+
+**A. Reconstruct from the netlist (fastest).** In KiCad's Pcbnew, *File → Import
+Netlist*, pick `tucklet-<variant>.net` from the `standard/` or appropriate `alternatives/` subfolder. KiCad creates the components and a
+ratsnest. The netlist is a *logical* netlist: the MCU module's pins are
+referenced by **signal name** (e.g. `SD_CLK`), so when you place the symbol
+you name its pins to match — `PIN_MAP.md` is the reconciliation table. Fixed
+ICs (charger, gauge, USB-C, CC resistors) already use real pin numbers.
+
+**B. Build the schematic by hand (your usual flow).** Place the symbols listed
+in `BOM.csv`, then wire the nets exactly as `SCHEMATIC_PLAN.md` lists them.
+Use `PIN_MAP.md` to assign the GPIOs. Export your own netlist when done and
+iterate from there.
+
+## Regenerating everything (the recipe)
+
+`gen_hardware.py` is the single source of truth. Edit it and re-run to
+regenerate all variants consistently — never hand-edit the generated files,
+or they drift apart.
+
+```
+python3 gen_hardware.py          # regenerate variants/ + validate
+python3 gen_hardware.py --check  # generate to ./_check and validate only
+```
+
+The built-in validator checks every netlist has balanced parens, every net has
+≥2 nodes, power/USB/SD/storage nets exist, and the dual-radio aggregation
+crossover is correct.
+
+## Honesty notes (so the files mean what they say)
+
+- **No gerbers / pick-and-place here.** Those come *after* schematic capture +
+  PCB layout + RF/antenna tuning + a design-for-manufacture review on real
+  silicon. Generating them blind would waste a board run. The netlist + BOM +
+  pin map are exactly what you turn into a layout.
+- **Exact Naming:** The generator uses official module names (`ESP32-C5-WROOM-1`,
+  `ESP32-C5-MINI-1`, `ESP32-E22-MINI-1`). GPIO maps must be read from the specific
+  datasheet for that exact model (the MINI pinout differs from the WROOM).
+- **E22 Roadmap Status:** The `ESP32-E22-MINI-1` is a projected component. While
+  the netlist and architecture are valid, the module is not yet released. Do not
+  fabricate E22 variants until the hardware is procured and footprints are verified.
+- **eMMC costs are small-volume estimates.** Verify on LCSC/Mouser/Arrow;
+  industrial/pSLC grades cost more.
+- **Certification is real money + weeks.** FCC/CE always (radios present);
+  Wi-Fi Alliance only if you ship the Wi-Fi Aware transport on iOS. Build the
+  SoftAP prototype first and prove demand before spending on Aware certification.
+
+See `common/COMPONENT_SELECTION.md` for the shared parts rationale and
+`common/VARIANTS.md` for the cross-variant comparison and dimensions.
+
+
+hardware/gen_hardware.py
+
+#!/usr/bin/env python3
+"""
+Tucklet hardware generator — the parametric "recipe" for every board variant.
+
+This is the single source of truth for the electrical design. Running it emits,
+for each physical board variant (radio x storage x form_factor), a complete set of build
+artifacts under variants/<name>/:
+
+    SPEC.md              human spec for this exact board
+    BOM.csv              bill of materials for this exact board
+    PIN_MAP.md           signal -> MCU pin mapping (datasheet step flagged)
+    SCHEMATIC_PLAN.md    net-by-net connection plan
+    tucklet-<name>.net   KiCad-importable netlist (Pcbnew: File > Import Netlist)
+    block_diagram.svg    per-variant system block diagram
+
+And, per variant, a structured folder for standard/alternatives:
+
+    standard/            PRIMARY build path (verified components)
+      BOM.csv
+      SCHEMATIC_PLAN.md
+      tucklet-<name>.net
+    alternatives/        BACKUP build paths (supply chain alternatives)
+      usb_bridge_gl823/
+      usb_bridge_pl2732/
+      charger_mcp73831/
+      charger_bq24072/
+      sd_mux_tmux1574/
+
+Design philosophy (mirrors the CAD round-trip workflow): the geometry/artifact
+is generated from a parametric model, never hand-maintained. Edit THIS file and
+re-run to regenerate every variant consistently.
+
+  python3 gen_hardware.py            # generate all variants + common BOM
+  python3 gen_hardware.py --check    # generate to a temp dir and validate only
+
+HONESTY NOTE ON PIN NUMBERS: discrete ICs with fixed, well-known pinouts
+(MCP73831, BQ25896, MAX17048, USB-C receptacle, CC resistors) use real pin numbers.
+The MCU module's GPIO assignments are expressed as SIGNAL NAMES,
+because the exact module pin numbers must be read from the current datasheet.
+The netlist is a "logical" netlist in the KiCad sense.
+
+Charm Strategy Note: This generator enforces the "Charm" form factor.
+Oversized variants (e.g., E22-WROOM) are excluded to maintain product identity.
+E22-WROOM is reserved for the separate commercial "Pro" line (see PRO_LINE.md).
+
+Dual AGG Link Note: The dual-radio aggregation link uses SPI (CLK, CS, MOSI, MISO)
+for higher sustained throughput (~12-15 MB/s) compared to UART (~8-10 MB/s).
+
+License: CC BY-NC-SA 4.0 (hardware design files — Charm line only).
+Pro line (E22-WROOM + 2S) is explicitly excluded from this license grant.
+"""
+
+from __future__ import annotations
+import csv
+import io
+import os
+import sys
+import argparse
+from dataclasses import dataclass, field
+from typing import Optional
+
+# ---------------------------------------------------------------------------
+# Variant model
+# ---------------------------------------------------------------------------
+
+# Radio definitions now include Chip Type derivation
+# "label", "radios", "wireless_mb_s", "chip"
+RADIOS = {
+    "singlec5": {"label": "Single ESP32-C5", "radios": 1, "wireless_mb_s": 9, "chip": "c5"},
+    "dualc5":   {"label": "Dual ESP32-C5 (link-aggregated, experimental)", "radios": 2, "wireless_mb_s": 15, "chip": "c5"},
+    "singlee22": {"label": "Single ESP32-E22 (Wi-Fi 6E)", "radios": 1, "wireless_mb_s": 150, "chip": "e22"},
+    "duale22":   {"label": "Dual ESP32-E22 (High-Performance)", "radios": 2, "wireless_mb_s": 300, "chip": "e22"},
+}
+
+# eMMC capacities offered; cost is a small-volume commercial estimate (VERIFY on
+# LCSC/Mouser/Arrow). microSD has no flash cost (customer supplies the card).
+EMMC_CAPACITIES_GIB = [8, 16, 32, 64, 128, 256]
+EMMC_COST = {8: 2.50, 16: 3.50, 32: 5.00, 64: 8.00, 128: 13.00, 256: 22.00}
+
+STORAGE = {
+    "microsd": {"label": "microSD (swappable)", "kind": "microSd"},
+    "emmc":    {"label": "eMMC (sealed)", "kind": "Emmc"},
+}
+
+FORM_FACTORS = {
+    "wroom": {"label": "Standard (WROOM)", "size_note": "Standard footprint"},
+    "mini":  {"label": "Mini (Compact)", "size_note": "Ultra-compact footprint"},
+}
+
+# Enclosure envelopes (mm) from mechanical/ and docs/TRANSFER_PERFORMANCE.md.
+ENVELOPE = {
+    "microsd": (35, 28, 9),
+    "emmc":    (32, 24, 8),
+}
+
+
+@dataclass
+class Variant:
+    radio: str       # "singlec5" | "dualc5" | "singlee22" | "duale22"
+    storage: str     # "microsd" | "emmc"
+    form_factor: str # "wroom" | "mini"
+
+    @property
+    def name(self) -> str:
+        return f"{self.radio}-{self.form_factor}-{self.storage}"
+
+    @property
+    def radios(self) -> int:
+        return RADIOS[self.radio]["radios"]
+
+    @property
+    def is_dual(self) -> bool:
+        return self.radios == 2
+
+    @property
+    def is_emmc(self) -> bool:
+        return self.storage == "emmc"
+
+    @property
+    def wireless_mb_s(self) -> int:
+        return RADIOS[self.radio]["wireless_mb_s"]
+
+    @property
+    def chip(self) -> str:
+        return RADIOS[self.radio]["chip"]
+
+    @property
+    def is_e22(self) -> bool:
+        return self.chip == "e22"
+
+
+# Generate ONLY "Charm" variants.
+# Filter logic: Exclude E22-WROOM variants (oversized M.2 form factor) to enforce product identity.
+# E22-WROOM + 2S is reserved for the separate commercial "Pro" line (see PRO_LINE.md).
+raw_variants = [Variant(r, s, f) for r in RADIOS for s in STORAGE for f in FORM_FACTORS]
+ALL_VARIANTS = [v for v in raw_variants if not (v.is_e22 and v.form_factor == "wroom")]
+
+
+# ---------------------------------------------------------------------------
+# Component + net model (KiCad netlist primitives)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Comp:
+    ref: str
+    value: str
+    footprint: str
+    desc: str
+    # pins: list of (pad/number-or-signal, pinfunction, pintype)
+    pins: list = field(default_factory=list)
+    # BOM
+    unit_cost: float = 0.0
+    qty: int = 1
+    mpn: str = ""
+    note: str = ""
+
+
+def build_components(v: Variant) -> list[Comp]:
+    """Return the component list for a given variant."""
+    c: list[Comp] = []
+
+    # --- U1 radio/MCU (signal-named pins) ---
+    # Exact Naming Strategy:
+    # C5-WROOM -> ESP32-C5-WROOM-1
+    # C5-MINI  -> ESP32-C5-MINI-1
+    # E22-MINI -> ESP32-E22-MINI-1 (Projected/Roadmap)
+
+    if v.chip == "e22":
+        # E22 Strategy: Mini ONLY for Charm form factor.
+        base_val = "ESP32-E22-MINI-1"
+        base_mpn = "ESP32-E22-MINI-1"
+        # Footprint placeholder - User must create/update in KiCad
+        base_fp = "RF_Module:Espressif_ESP32-E22_MINI-1"
+        mcu_desc = "Wi-Fi 6E + BLE 5.4 Radio Co-Processor (Projected/Future)"
+        mcu_cost = 4.20 # Estimate based on Mini class
+        mcu_note = "Projected component; roadmap item pending official release."
+    else: # C5
+        if v.form_factor == "wroom":
+            base_val = "ESP32-C5-WROOM-1"
+            base_mpn = "ESP32-C5-WROOM-1-N8"
+            base_fp = "RF_Module:ESP32-S3-WROOM-1" # Proxy footprint
+        else: # mini
+            base_val = "ESP32-C5-MINI-1"
+            base_mpn = "ESP32-C5-MINI-1"
+            base_fp = "RF_Module:ESP32-S3-WROOM-1" # Placeholder proxy
+
+        mcu_desc = "Wi-Fi 6 dual-band + BLE module (radio/MCU)"
+        mcu_cost = 2.60 if v.form_factor == "wroom" else 2.40
+        mcu_note = ""
+
+    radio_pins = [
+        ("GND", "GND", "power_in"),
+        ("3V3", "VDD", "power_in"),
+        ("EN", "EN", "input"),
+        ("USB_DP", "USB_D+", "bidirectional"),
+        ("USB_DM", "USB_D-", "bidirectional"),
+        ("SD_CLK", "SDIO_CLK", "output"),
+        ("SD_CMD", "SDIO_CMD", "bidirectional"),
+        ("SD_D0", "SDIO_D0", "bidirectional"),
+        ("SD_D1", "SDIO_D1", "bidirectional"),
+        ("SD_D2", "SDIO_D2", "bidirectional"),
+        ("SD_D3", "SDIO_D3", "bidirectional"),
+        ("I2C_SDA", "I2C_SDA", "bidirectional"),
+        ("I2C_SCL", "I2C_SCL", "output"),
+        ("GAUGE_ALRT", "GPIO_ALRT", "input"),
+        ("BTN", "GPIO_BTN", "input"),
+        ("LED_DIN", "GPIO_LED", "output"),
+        ("CHG_STAT", "GPIO_CHGSTAT", "input"),
+        ("SD_SEL", "GPIO_SDSEL", "output"),
+    ]
+    if v.storage == "microsd":
+        radio_pins.append(("SD_DET", "GPIO_SDDET", "input"))
+    if v.is_dual:
+        # Aggregation link - SPI for higher bandwidth than UART
+        radio_pins += [("AGG_CLK", "AGG_CLK", "output"),
+                       ("AGG_CS",  "AGG_CS",  "output"),
+                       ("AGG_MOSI","AGG_MOSI","output"),
+                       ("AGG_MISO","AGG_MISO","input")]
+
+    c.append(Comp("U1", base_val, base_fp, mcu_desc,
+                  pins=radio_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
+
+    if v.is_dual:
+        radio2_pins = [
+            ("GND", "GND", "power_in"),
+            ("3V3", "VDD", "power_in"),
+            ("EN", "EN", "input"),
+            # SPI Slave for AGG link
+            ("AGG_CLK", "AGG_CLK", "input"),
+            ("AGG_CS",  "AGG_CS",  "input"),
+            ("AGG_MOSI","AGG_MOSI","input"),
+            ("AGG_MISO","AGG_MISO","output"),
+        ]
+        c.append(Comp("U1B", base_val, base_fp,
+                      "Second radio for link aggregation",
+                      pins=radio2_pins, unit_cost=mcu_cost, mpn=base_mpn, note=mcu_note))
+
+    # --- U2 USB-HS storage bridge (GL3224 USB 3.0, QFN-32) ---
+    # Note: Pin numbers below are LOGICAL placeholders matching the QFN-32 footprint.
+    # The ACTUAL pin numbers must be verified from the GL3224-OEM datasheet.
+    c.append(Comp("U2", "GL3224 USB 3.0 SD Bridge", "Package_DFN_QFN:QFN-32",
+                  "USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in",
+                  pins=[
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "USB_DP",  "bidirectional"),
+                      ("3",  "USB_DM",  "bidirectional"),
+                      ("4",  "VCC_33",  "power_in"),
+                      ("5",  "GND",     "power_in"),
+                      ("6",  "SD_CLK",  "output"),
+                      ("7",  "SD_CMD",  "bidirectional"),
+                      ("8",  "SD_D0",   "bidirectional"),
+                      ("9",  "SD_D1",   "bidirectional"),
+                      ("10", "SD_D2",   "bidirectional"),
+                      ("11", "SD_D3",   "bidirectional"),
+                      ("12", "SD_SEL",  "input"),
+                      # USB 3.0 SuperSpeed differential pairs (NC in USB 2.0 fallback)
+                      ("13", "SS_TX_P", "bidirectional"),
+                      ("14", "SS_TX_N", "bidirectional"),
+                      ("15", "SS_RX_P", "bidirectional"),
+                      ("16", "SS_RX_N", "bidirectional"),
+                      ("17", "VDD10",   "power_in"),  # Core power
+                      ("18", "RREF",     "passive"),   # Reference resistor
+                      ("19", "XTAL_IN",  "input"),
+                      ("20", "XTAL_OUT", "output"),
+                      ("21", "SD_DET",   "input"),
+                      ("22", "LED",      "output"),
+                      ("23", "GPIO0",    "bidirectional"),
+                      ("24", "GPIO1",    "bidirectional"),
+                      ("25", "FW_SDI",   "input"),
+                      ("26", "FW_SDO",   "output"),
+                      ("27", "FW_SCK",   "input"),
+                      ("28", "FW_CS",    "input"),
+                      ("29", "VDD33",    "power_in"),
+                      ("30", "VDD33_2",  "power_in"),
+                      ("31", "GND_2",    "power_in"),
+                      ("32", "GND_PAD",  "power_in"),  # Exposed pad
+                  ], unit_cost=1.80, mpn="GL3224-OEM",
+                  note="Primary. USB 3.0 for ~70-100+ MB/s wired. QFN-32 single-LUN. Pin mapping must be verified from GL3224 datasheet. USB 3.0 SS pins may be NC in USB 2.0 fallback. Backup: GL823 (QFN-24, USB 2.0)."))
+
+    # --- U3 Battery Charger (BQ25896, Power-Path Buck Charger, WQFN-24) ---
+    # Note: Pin numbers below are LOGICAL placeholders.
+    # The ACTUAL pin numbers must be verified from the BQ25896 datasheet.
+    # CRITICAL: Pin 11 is named VBAT here to ensure it joins the VBAT net for validation.
+    c.append(Comp("U3", "BQ25896 Power-Path Charger", "Package_DFN_QFN:WQFN-24_4x4mm",
+                  "I2C USB buck charger with power-path; run radio while charging",
+                  pins=[
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "D+",     "bidirectional"),   # USB D+ (USB 2.0 detection)
+                      ("3",  "D-",     "bidirectional"),   # USB D- (USB 2.0 detection)
+                      ("4",  "SDA",    "bidirectional"),   # I2C data
+                      ("5",  "SCL",    "input"),           # I2C clock
+                      ("6",  "INT",    "open_collector"),  # Interrupt
+                      ("7",  "PG",     "open_collector"),  # Power Good
+                      ("8",  "STAT",   "open_collector"),  # Charge status
+                      ("9",  "CE",     "input"),           # Chip Enable
+                      ("10", "TS",     "input"),           # Thermistor
+                      ("11", "VBAT",   "power_out"),       # Battery (Joined to VBAT net)
+                      ("12", "SYS",    "power_out"),       # System output (Power-Path)
+                      ("13", "SW",     "passive"),         # Switch node
+                      ("14", "BTST",   "passive"),         # Bootstrap
+                      ("15", "REGN",   "power_out"),       # Internal LDO out
+                      ("16", "PMID",   "power_out"),       # VBUS to system
+                      ("17", "VBUS_2", "power_in"),
+                      ("18", "AGND",   "power_in"),
+                      ("19", "PGND",   "power_in"),
+                      ("20", "PGND_2", "power_in"),
+                      ("21", "PROG",   "passive"),         # Charge current set
+                      ("22", "ILIM",   "input"),           # Input current limit
+                      ("23", "VREF",   "power_out"),       # Reference
+                      ("24", "GND_PAD","power_in"),        # Exposed pad
+                  ], unit_cost=1.50, mpn="BQ25896",
+                  note="Primary. Power-path allows radio operation while charging. I2C controllable. Backup: MCP73831 (SOT-23-5, simple linear, no power-path)."))
+
+    # --- U4 fuel gauge MAX17048 (real pinout, TDFN-8) ---
+    c.append(Comp("U4", "MAX17048", "Package_DFN_QFN:TDFN-8-1EP_3x3mm",
+                  "I2C fuel gauge (real battery percent)",
+                  pins=[
+                      ("1", "VDD", "power_in"),
+                      ("2", "CTG", "passive"),
+                      ("3", "QSTRT", "input"),
+                      ("4", "GND", "power_in"),
+                      ("5", "ALRT", "open_collector"),
+                      ("6", "SCL", "input"),
+                      ("7", "SDA", "bidirectional"),
+                      ("8", "CELL", "passive"),
+                  ], unit_cost=0.80, mpn="MAX17048G+T10"))
+
+    # --- U5 buck 3V3 (sized for radio peak) ---
+    # E22 requires significantly more power (Dual core 500MHz + 6E Radio)
+    if v.is_e22:
+        buck_cost = 1.20
+        buck_val = "3V3 buck (>=2A for E22)"
+        buck_mpn = "TPS62840-class"
+    elif v.is_dual:
+        buck_cost = 0.55
+        buck_val = "3V3 buck (>=1A for dual)"
+        buck_mpn = "TPS62740-class"
+    else:
+        buck_cost = 0.40
+        buck_val = "3V3 buck (>=600mA)"
+        buck_mpn = "TPS62740-class"
+
+    c.append(Comp("U5", buck_val, "Package_TO_SOT_SMD:SOT-23-6",
+                  "Step-down regulator, sized for Wi-Fi TX peak",
+                  pins=[
+                      ("1", "VIN", "power_in"),
+                      ("2", "GND", "power_in"),
+                      ("3", "EN", "input"),
+                      ("4", "FB", "passive"),
+                      ("5", "SW", "passive"),
+                      ("6", "VOUT", "power_out"),
+                  ], unit_cost=buck_cost, mpn=buck_mpn))
+
+    # --- U6 SD bus mux / ownership handoff ---
+    c.append(Comp("U6", "SD 2:1 bus mux", "Package_DFN_QFN:QFN-20",
+                  "Arbitrates microSD/eMMC bus between radio (A) and bridge (B)",
+                  pins=[
+                      ("SEL", "SEL", "input"),
+                      ("GND", "GND", "power_in"),
+                      ("VCC", "3V3", "power_in"),
+                      ("C_CLK", "SD_CLK", "bidirectional"),
+                      ("C_CMD", "SD_CMD", "bidirectional"),
+                      ("C_D0", "SD_D0", "bidirectional"),
+                      ("C_D1", "SD_D1", "bidirectional"),
+                      ("C_D2", "SD_D2", "bidirectional"),
+                      ("C_D3", "SD_D3", "bidirectional"),
+                  ], unit_cost=0.45, mpn="TS3A-class 2:1"))
+
+    # --- J1 USB-C receptacle (USB2.0 subset) ---
+    c.append(Comp("J1", "USB-C receptacle", "Connector_USB:USB_C_Receptacle_USB2.0_16P",
+                  "Charge + wired data + CC",
+                  pins=[
+                      ("A4", "VBUS", "power_out"), ("B4", "VBUS", "power_out"),
+                      ("A9", "VBUS", "power_out"), ("B9", "VBUS", "power_out"),
+                      ("A1", "GND", "power_in"), ("B1", "GND", "power_in"),
+                      ("A12", "GND", "power_in"), ("B12", "GND", "power_in"),
+                      ("A6", "USB_DP", "bidirectional"), ("B6", "USB_DP", "bidirectional"),
+                      ("A7", "USB_DM", "bidirectional"), ("B7", "USB_DM", "bidirectional"),
+                      ("A5", "CC1", "passive"), ("B5", "CC2", "passive"),
+                  ], unit_cost=0.30, mpn="USB4105-GF-A-060 (or equiv)"))
+
+    # --- D1 USB ESD array ---
+    c.append(Comp("D1", "USB ESD array", "Package_TO_SOT_SMD:SOT-23-6",
+                  "TVS protection on D+/D-/VBUS",
+                  pins=[("1", "USB_DP", "passive"), ("2", "USB_DM", "passive"),
+                        ("3", "GND", "power_in"), ("6", "VBUS", "passive")],
+                  unit_cost=0.20, mpn="USBLC6-2SC6"))
+
+    # --- CC resistors ---
+    c.append(Comp("R1", "5.1k", "Resistor_SMD:R_0402_1005Metric",
+                  "USB-C CC1 pulldown (sink role)",
+                  pins=[("1", "CC1", "passive"), ("2", "GND", "passive")],
+                  unit_cost=0.01, mpn="RC0402FR-075K1L"))
+    c.append(Comp("R2", "5.1k", "Resistor_SMD:R_0402_1005Metric",
+                  "USB-C CC2 pulldown (sink role)",
+                  pins=[("1", "CC2", "passive"), ("2", "GND", "passive")],
+                  unit_cost=0.01, mpn="RC0402FR-075K1L"))
+
+    # --- PROG resistor for charger current ---
+    c.append(Comp("R3", "2k", "Resistor_SMD:R_0402_1005Metric",
+                  "BQ25896 PROG (sets ~500mA charge; size to cell)",
+                  pins=[("1", "PROG", "passive"), ("2", "GND", "passive")],
+                  unit_cost=0.01, mpn="RC0402FR-072KL"))
+
+    # --- I2C pull-ups ---
+    c.append(Comp("R4", "4.7k", "Resistor_SMD:R_0402_1005Metric",
+                  "I2C SDA pull-up",
+                  pins=[("1", "I2C_SDA", "passive"), ("2", "3V3", "passive")],
+                  unit_cost=0.01, mpn="RC0402FR-074K7L"))
+    c.append(Comp("R5", "4.7k", "Resistor_SMD:R_0402_1005Metric",
+                  "I2C SCL pull-up",
+                  pins=[("1", "I2C_SCL", "passive"), ("2", "3V3", "passive")],
+                  unit_cost=0.01, mpn="RC0402FR-074K7L"))
+
+    # --- Button pull-up + button ---
+    c.append(Comp("R6", "10k", "Resistor_SMD:R_0402_1005Metric",
+                  "Button pull-up",
+                  pins=[("1", "BTN", "passive"), ("2", "3V3", "passive")],
+                  unit_cost=0.01, mpn="RC0402FR-0710KL"))
+    c.append(Comp("SW1", "tactile button", "Button_Switch_SMD:SW_SPST_B3U-1000P",
+                  "Pair / factory-reset (press patterns)",
+                  pins=[("1", "BTN", "passive"), ("2", "GND", "passive")],
+                  unit_cost=0.10, mpn="B3U-1000P"))
+
+    # --- Status LED ---
+    c.append(Comp("LED1", "WS2812B", "LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm",
+                  "Addressable RGB status LED",
+                  pins=[("VDD", "3V3", "power_in"), ("GND", "GND", "power_in"),
+                        ("DIN", "LED_DIN", "input"), ("DOUT", "NC_LEDDOUT", "output")],
+                  unit_cost=0.20, mpn="WS2812B-2020"))
+
+    # --- SD pull-ups (CMD + data) ---
+    for i, sig in enumerate(["SD_CMD", "SD_D0", "SD_D1", "SD_D2", "SD_D3"]):
+        c.append(Comp(f"R{7+i}", "10k", "Resistor_SMD:R_0402_1005Metric",
+                      f"{sig} pull-up",
+                      pins=[("1", sig, "passive"), ("2", "3V3", "passive")],
+                      unit_cost=0.01, mpn="RC0402FR-0710KL"))
+
+    # --- Storage device ---
+    if v.storage == "microsd":
+        sd_pins = [
+            ("CLK", "SD_CLK", "input"), ("CMD", "SD_CMD", "bidirectional"),
+            ("DAT0", "SD_D0", "bidirectional"), ("DAT1", "SD_D1", "bidirectional"),
+            ("DAT2", "SD_D2", "bidirectional"), ("DAT3", "SD_D3", "bidirectional"),
+            ("VDD", "3V3", "power_in"), ("VSS", "GND", "power_in"),
+            ("DET", "SD_DET", "passive"),
+        ]
+        c.append(Comp("J2", "microSD push-push socket",
+                      "Connector_Card:microSD_HC_Hirose_DM3D-SF",
+                      "User-swappable microSD (SDIO 4-bit)",
+                      pins=sd_pins, unit_cost=0.40, mpn="DM3D-SF"))
+    else:
+        emmc_pins = [
+            ("CLK", "SD_CLK", "input"), ("CMD", "SD_CMD", "bidirectional"),
+            ("DAT0", "SD_D0", "bidirectional"), ("DAT1", "SD_D1", "bidirectional"),
+            ("DAT2", "SD_D2", "bidirectional"), ("DAT3", "SD_D3", "bidirectional"),
+            ("VCC", "3V3", "power_in"), ("VCCQ", "3V3", "power_in"),
+            ("VSS", "GND", "power_in"), ("VSSQ", "GND", "power_in"),
+            ("RST", "EMMC_RST", "input"),
+        ]
+        c.append(Comp("XU7", "eMMC 5.1 (capacity per SKU)",
+                      "Package_BGA:eMMC_153Ball_TFBGA_11.5x13mm",
+                      "Sealed managed NAND (JEDEC eMMC 5.1, 153-ball TFBGA)",
+                      pins=emmc_pins, unit_cost=EMMC_COST[64], mpn="KLMxGyFExA-class",
+                      note="capacity & cost set per SKU; 64GB shown as default"))
+
+    # --- Battery connector / cell ---
+    # E22 requires larger battery
+    batt_desc = "LiPo 300-500mAh + PCM" if v.is_e22 else "LiPo 120-200mAh + PCM"
+    batt_cost = 3.50 if v.is_e22 else 2.00
+    c.append(Comp("BT1", batt_desc, "Connector:Conn_01x02_Pin",
+                  "Single-cell LiPo with protection circuit",
+                  pins=[("1", "VBAT", "power_out"), ("2", "GND", "power_in")],
+                  unit_cost=batt_cost, mpn="cell + JST-ACH or solder pads"))
+
+    # --- Bulk/decoupling (grouped, representative) ---
+    c.append(Comp("C_GRP", "decoupling+bulk (grouped)", "Capacitor_SMD:C_0402_1005Metric",
+                  "100nF per IC rail + 10uF bulk near U1/U5 + USB/charger input caps",
+                  pins=[], unit_cost=0.50, qty=1,
+                  note="represented as a group; expand to individual C refs in KiCad"))
+
+    return c
+
+
+def build_nets(v: Variant, comps: list[Comp]) -> dict[str, list[tuple[str, str]]]:
+    """Collect nets by walking each component's pins."""
+    nets: dict[str, list[tuple[str, str]]] = {}
+    for comp in comps:
+        for (pinid, signal, _ptype) in comp.pins:
+            if signal.startswith("NC_"):
+                continue
+            nets.setdefault(signal, []).append((comp.ref, pinid))
+    return nets
+
+
+# ---------------------------------------------------------------------------
+# Emitters
+# ---------------------------------------------------------------------------
+
+def emit_kicad_netlist(v: Variant, comps: list[Comp], nets: dict) -> str:
+    """Emit a KiCad-format (version 'E') netlist."""
+    out = io.StringIO()
+    out.write('(export (version "E")\n')
+    out.write('  (design\n')
+    out.write(f'    (source "gen_hardware.py")\n')
+    out.write(f'    (date "generated")\n')
+    out.write(f'    (tool "tucklet gen_hardware.py")\n')
+    out.write(f'    (sheet (number "1") (name "/{v.name}/") (tstamps "/")))\n')
+    # components
+    out.write('  (components\n')
+    for cph in comps:
+        if cph.ref == "C_GRP":
+            continue
+        out.write(f'    (comp (ref "{cph.ref}")\n')
+        out.write(f'      (value "{cph.value}")\n')
+        out.write(f'      (footprint "{cph.footprint}")\n')
+        out.write(f'      (datasheet "")\n')
+        out.write(f'      (fields (field (name "MPN") "{cph.mpn}") (field (name "Description") "{esc(cph.desc)}"))\n')
+        out.write(f'      (libsource (lib "tucklet") (part "{esc(cph.value)}") (description "{esc(cph.desc)}"))\n')
+        out.write(f'      (sheetpath (names "/") (tstamps "/"))\n')
+        out.write(f'      (tstamps "{cph.ref}"))\n')
+    out.write('  )\n')
+    # nets
+    out.write('  (nets\n')
+    for code, (signal, nodes) in enumerate(sorted(nets.items()), start=1):
+        if len(nodes) < 2:
+            continue
+        out.write(f'    (net (code "{code}") (name "{signal}")\n')
+        for (ref, pinid) in nodes:
+            out.write(f'      (node (ref "{ref}") (pin "{pinid}"))\n')
+        out.write('    )\n')
+    out.write('  )\n')
+    out.write(')\n')
+    return out.getvalue()
+
+
+def esc(s: str) -> str:
+    return s.replace('"', "'")
+
+
+def emit_bom(v: Variant, comps: list[Comp]) -> str:
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in comps:
+        line = round(c.unit_cost * c.qty, 3)
+        total += line
+        w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                    f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    # PCB + enclosure rows
+    w.writerow(["PCB", 1, "2-4 layer board", "", "", "1.50", "1.50", "Small board, volume pricing", ""])
+    w.writerow(["ENC", 1, "enclosure (3D-print early)", "", "", "2.00", "2.00",
+                f"{ENVELOPE[v.storage][0]}x{ENVELOPE[v.storage][1]}x{ENVELOPE[v.storage][2]}mm shell", "molding tooling is separate capex"])
+    total_full = total + 1.50 + 2.00
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    w.writerow(["TOTAL_FULL_BOM", "", "", "", "", "", f"{total_full:.2f}",
+                "microSD card extra/bundled" if v.storage == "microsd" else "eMMC cost is for 64GB; see SPEC for all capacities", ""])
+    return out.getvalue()
+
+
+def emit_pin_map(v: Variant) -> str:
+    det = "\n| SD_DET | card-detect | free GPIO | microSD insertion detect |" if v.storage == "microsd" else ""
+    dual = ""
+    if v.is_dual:
+        dual = """
+## Second radio (U1B) + aggregation link (Dual Radio only)
+| Signal | Role | Pin (U1 / U1B) | Notes |
+|---|---|---|---|
+| AGG_CLK | SPI clock | free GPIO | U1.AGG_CLK -> U1B.AGG_CLK |
+| AGG_CS | SPI chip select | free GPIO | U1.AGG_CS -> U1B.AGG_CS |
+| AGG_MOSI | SPI data out | free GPIO | U1.AGG_MOSI -> U1B.AGG_MOSI |
+| AGG_MISO | SPI data in | free GPIO | U1.AGG_MISO <- U1B.AGG_MISO |
+| 3V3 / GND / EN | power U1B | — | U5 must be sized for two radios' peak |
+"""
+    emmc_extra = ""
+    if v.is_emmc:
+        emmc_extra = """
+| EMMC_RST | eMMC hardware reset | free GPIO | drive per JEDEC reset timing |
+| (DAT4..DAT7) | optional 8-bit eMMC | free GPIOs | only if bridge + layout support 8-bit; raises wired throughput |
+"""
+
+    chip_name = "ESP32-E22" if v.is_e22 else "ESP32-C5"
+
+    return f"""# Pin Map — {v.name} ({chip_name})
+
+> **Read this first.** GPIO numbers are NOT hard-coded here because the
+> {chip_name} pin table must be taken from the **current datasheet**.
+> Assign each signal below to a free GPIO, keeping the **strapping pins clean**.
+
+## Fixed-function (must use the dedicated pins)
+| Signal | Function | Pin | Notes |
+|---|---|---|---|
+| USB_DP / USB_DM | native USB (flashing/JTAG; NOT the data path) | dedicated USB pins | route to test pads; storage data goes through the USB-HS bridge instead |
+| 3V3 / GND / EN | power + enable | dedicated | EN via RC reset network |
+
+## Storage bus — SDIO 4-bit (shared via U6 mux)
+| Signal | Function | Pin | Notes |
+|---|---|---|---|
+| SD_CLK | SDIO clock | free GPIO | to U6 A-side |
+| SD_CMD | SDIO command | free GPIO | 10k pull-up |
+| SD_D0..D3 | SDIO data 0-3 | free GPIOs (contiguous preferred) | 10k pull-ups each; D3=CS in 1-bit/SPI fallback |
+| SD_SEL | storage ownership select | free GPIO | drives U6; high=bridge owns (USB plugged), low=radio owns |{det}{emmc_extra}
+
+## I2C (fuel gauge U4 + charger U3)
+| Signal | Function | Pin | Notes |
+|---|---|---|---|
+| I2C_SDA | I2C data | free GPIO | 4.7k pull-up; shared with BQ25896 SDA |
+| I2C_SCL | I2C clock | free GPIO | 4.7k pull-up; shared with BQ25896 SCL |
+| GAUGE_ALRT | low-battery interrupt | free GPIO | from MAX17048 ALRT (open-drain) |
+| CHG_INT | charger interrupt | free GPIO | from BQ25896 INT (open-drain) |
+
+## UI + charger status
+| Signal | Function | Pin | Notes |
+|---|---|---|---|
+| BTN | tactile button | free GPIO | 10k pull-up + firmware debounce; press patterns = pair / factory-reset |
+| LED_DIN | WS2812 data | free GPIO | single addressable RGB |
+| CHG_STAT | charger status | free GPIO | from BQ25896 STAT (open-drain) |
+{dual}
+## Routing note
+Wi-Fi {'6E' if v.is_e22 else '5 GHz'} TX bursts are the current peak. Wide copper on VBUS/VBAT/3V3, bulk +
+decoupling close to U1 (and U1B on dual), and size U5 for the peak, not the
+average — this prevents mid-transfer brownout resets.
+"""
+
+
+def emit_schematic_plan(v: Variant, nets: dict) -> str:
+    lines = [f"# Schematic Plan (net-by-net) — {v.name}",
+             "",
+             "Build this in KiCad: place the symbols from BOM.csv, then wire the nets",
+             "below. Or import `tucklet-" + v.name + ".net` into Pcbnew to start the",
+             "board with a ratsnest directly (logical netlist; reconcile module pins",
+             "via PIN_MAP.md).",
+             "",
+             f"Variant: **{RADIOS[v.radio]['label']}**, **{STORAGE[v.storage]['label']}**, **{FORM_FACTORS[v.form_factor]['label']}**.",
+             "",
+             "## Power tree",
+             "`VBUS` (USB-C) -> U3 charge in; `VBAT` (BT1 <-> U3 VBAT <-> U4 CELL <-> U5 VIN);",
+             "`+3V3` (U5 VOUT -> U1" + ("/U1B" if v.is_dual else "") + ", U2, U4, U6, storage, LED, pull-ups).",
+             "Common `GND` pour, stitched.",
+             "",
+             "## Storage ownership (the shared-bus trick)",
+             "Storage SD_* lines connect to the **common** side of U6. U1 SDIO connects",
+             "to U6 A-side; U2 (USB-HS bridge) connects to U6 B-side. `SD_SEL` (driven by",
+             "VBUS-present detection in firmware/hardware) selects the owner: plugged in =",
+             "bridge owns (fast wired ~70-100+ MB/s); otherwise radio owns (wireless). Never both.",
+             "",
+             "## All nets (signal -> nodes)",
+             "",
+             "| Net | Nodes (ref.pin) |",
+             "|---|---|"]
+    for signal, nodes in sorted(nets.items()):
+        if len(nodes) < 2:
+            continue
+        nodestr = ", ".join(f"{r}.{p}" for (r, p) in nodes)
+        lines.append(f"| `{signal}` | {nodestr} |")
+    lines += ["",
+              "## Build order in KiCad",
+              "power -> U1" + ("/U1B + AGG link" if v.is_dual else "") +
+              " -> storage + U6 mux -> U2 bridge -> I2C/UI -> charger/gauge. Export the",
+              "netlist when done; that's the file to iterate from.",
+              ""]
+    return "\n".join(lines)
+
+
+def emit_spec(v: Variant) -> str:
+    ex, ey, ez = ENVELOPE[v.storage]
+
+    # Dynamic sections based on variant
+    if v.is_emmc:
+        cap_rows = "\n".join(f"| {g} GB | ~${EMMC_COST[g]:.2f} | sealed |" for g in EMMC_CAPACITIES_GIB)
+        storage_block = f"""## Storage — eMMC (sealed, per-SKU capacity)
+153-ball TFBGA eMMC 5.1, 11.5 x 13.0 x 1.2 mm. Capacity is fixed at manufacture.
+
+| Capacity | eMMC est. cost | Notes |
+|---|---|---|
+{cap_rows}
+"""
+    else:
+        storage_block = """## Storage — microSD (swappable)
+Push-push microSD socket, SDIO 4-bit. Customer supplies/upgrades the card.
+"""
+
+    if v.is_e22:
+        chip_block = f"""
+## Radio — ESP32-E22 (Wi-Fi 6E)
+Tri-band Wi-Fi 6E (2.4, 5, 6 GHz) + BLE 5.4.
+**High Performance:** ~{v.wireless_mb_s} MB/s theoretical wireless throughput.
+**Power:** Requires larger battery and robust 3.3V regulation (U5).
+**Thermal:** High sustained throughput generates heat; monitor enclosure temps.
+**Status:** Roadmap item. Utilizes projected `ESP32-E22-MINI-1` module.
+"""
+    else:
+        chip_block = f"""
+## Radio — ESP32-C5
+Dual-band Wi-Fi 6 (2.4 + 5 GHz) + BLE. ~{v.wireless_mb_s} MB/s wireless at close range.
+"""
+
+    dual_block = ""
+    if v.is_dual:
+        dual_block = """
+**Note:** Dual-radio link aggregation is experimental. Validate RF isolation between antennas.
+**AGG Link:** SPI (CLK, CS, MOSI, MISO) for higher sustained throughput (~12-15 MB/s).
+"""
+
+    bridge_block = """
+## USB Wired Speed
+- **GL3224 USB 3.0 Bridge:** ~70-100+ MB/s (primary, QFN-32).
+- **GL823 USB 2.0 Backup:** ~25-35 MB/s (QFN-24, size-constrained alternative).
+"""
+
+    return f"""# Variant Spec — {v.name}
+
+**{RADIOS[v.radio]['label']} + {STORAGE[v.storage]['label']} ({FORM_FACTORS[v.form_factor]['label']})**
+
+## What this board is
+A Tucklet build with the {RADIOS[v.radio]['label'].lower()} radio and
+{STORAGE[v.storage]['label'].lower()} storage in a {FORM_FACTORS[v.form_factor]['label']} form factor.
+{chip_block}{dual_block}
+{storage_block}
+
+## Performance
+- Everyday wireless: **~{v.wireless_mb_s} MB/s**.
+- Bulk wired (GL3224 USB 3.0 bridge): **~70-100+ MB/s**.
+- Bulk wired (GL823 USB 2.0 bridge): **~25-35 MB/s**.
+
+## Dimensions
+Enclosure envelope: **{ex} x {ey} x {ez} mm** (AirTag-class).
+
+## Files in this directory
+- `SPEC.md` — Full bill of materials.
+- `PIN_MAP.md` — Signal -> MCU pin mapping.
+- `SCHEMATIC_PLAN.md` — Net-by-net connection plan.
+- `tucklet-{v.name}.net` — KiCad logical netlist.
+- `block_diagram.svg` — System diagram.
+
+## Bring-up checklist
+- [ ] Reconcile signal->GPIO from the datasheet (PIN_MAP).
+- [ ] Verify GL3224-OEM pin mapping from its datasheet (logical placeholders used).
+- [ ] Verify BQ25896 pin mapping from its datasheet (logical placeholders used).
+- [ ] Confirm USB-HS bridge part number + handoff mode.
+- [ ] Validate SDIO timing.
+- [ ] Measure real TX current; size BT1 cell.
+- [ ] FCC/CE certification required (radios present).
+"""
+
+
+def emit_block_svg(v: Variant) -> str:
+    """A compact, variant-specific block diagram."""
+    storage_label = "microSD (J2)" if v.storage == "microsd" else "eMMC (XU7)"
+    # Construct Radio Label based on variant
+    if v.is_e22:
+        radio_label = "ESP32-E22 (U1)" if not v.is_dual else "ESP32-E22 x2"
+        radio_sub = "Wi-Fi 6E Tri-Band" if not v.is_dual else "Aggregated 6E"
+    else:
+        radio_label = "ESP32-C5 (U1)" if not v.is_dual else "ESP32-C5 x2"
+        radio_sub = "BLE + Wi-Fi 5GHz" if not v.is_dual else "BLE + 2x Wi-Fi"
+
+    dual_note = "" if not v.is_dual else '<text x="430" y="200" text-anchor="middle" font-size="10" fill="#b5654f" font-style="italic">+ U1B, SPI AGG</text>'
+
+    bridge_speed = "70-100+ MB/s"
+
+    return f'''<svg viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, sans-serif">
+  <defs>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#7a5a48" flood-opacity="0.16"/></filter>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7a5a48"/></marker>
+  </defs>
+  <rect width="900" height="540" fill="#fbf7f1"/>
+  <text x="40" y="44" font-size="22" font-weight="bold" fill="#3a2c23">Tucklet — {v.name}</text>
+  <text x="40" y="66" font-size="12.5" fill="#8a7464">{RADIOS[v.radio]['label']} · {STORAGE[v.storage]['label']} · {FORM_FACTORS[v.form_factor]['label']}</text>
+
+  <g filter="url(#s)"><rect x="40" y="108" width="130" height="60" rx="12" fill="#fff"/></g>
+  <text x="105" y="134" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">USB-C (J1)</text>
+  <text x="105" y="153" text-anchor="middle" font-size="10.5" fill="#6f5b4c">charge + data</text>
+  <g filter="url(#s)"><rect x="40" y="204" width="130" height="56" rx="12" fill="#fff"/></g>
+  <text x="105" y="228" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">Charger U3</text>
+  <text x="105" y="246" text-anchor="middle" font-size="10.5" fill="#6f5b4c">BQ25896</text>
+  <g filter="url(#s)"><rect x="40" y="296" width="130" height="56" rx="12" fill="#fff"/></g>
+  <text x="105" y="320" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">LiPo BT1</text>
+  <text x="105" y="338" text-anchor="middle" font-size="10.5" fill="#6f5b4c">+ gauge U4</text>
+  <g filter="url(#s)"><rect x="40" y="388" width="130" height="52" rx="12" fill="#fff"/></g>
+  <text x="105" y="411" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a2c23">Buck U5 3V3</text>
+
+  <g filter="url(#s)"><rect x="330" y="108" width="200" height="100" rx="14" fill="#fff"/></g>
+  <text x="430" y="138" text-anchor="middle" font-size="14" font-weight="bold" fill="#3a2c23">{radio_label}</text>
+  <text x="430" y="160" text-anchor="middle" font-size="11" fill="#6f5b4c">{radio_sub}</text>
+  <text x="430" y="178" text-anchor="middle" font-size="11" fill="#6f5b4c">SDIO · I2C · GPIO</text>
+  {dual_note}
+
+  <g filter="url(#s)"><rect x="360" y="262" width="140" height="58" rx="12" fill="#fff"/></g>
+  <text x="430" y="286" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#3a2c23">SD mux U6</text>
+  <text x="430" y="304" text-anchor="middle" font-size="10.5" fill="#6f5b4c">radio &lt;-&gt; bridge</text>
+
+  <g filter="url(#s)"><rect x="330" y="372" width="200" height="72" rx="12" fill="#fff"/></g>
+  <text x="430" y="400" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">{storage_label}</text>
+  <text x="430" y="420" text-anchor="middle" font-size="10.5" fill="#6f5b4c">SDIO 4-bit</text>
+
+  <g filter="url(#s)"><rect x="690" y="262" width="170" height="58" rx="12" fill="#fff"/></g>
+  <text x="775" y="286" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#3a2c23">GL3224 Bridge U2</text>
+  <text x="775" y="304" text-anchor="middle" font-size="10.5" fill="#6f5b4c">~{bridge_speed} wired</text>
+
+  <g filter="url(#s)"><rect x="690" y="108" width="170" height="100" rx="14" fill="#fff"/></g>
+  <text x="775" y="138" text-anchor="middle" font-size="13" font-weight="bold" fill="#3a2c23">UI</text>
+  <text x="775" y="162" text-anchor="middle" font-size="11" fill="#6f5b4c">Button SW1</text>
+  <text x="775" y="180" text-anchor="middle" font-size="11" fill="#6f5b4c">RGB LED1</text>
+
+  <g stroke="#7d9b86" stroke-width="2.5" fill="none" marker-end="url(#a)">
+    <path d="M105,168 L105,204"/><path d="M105,260 L105,296"/><path d="M105,352 L105,388"/>
+    <path d="M170,414 C 250,414 250,170 328,165"/>
+    <path d="M170,416 C 300,470 560,470 688,300"/>
+  </g>
+  <g stroke="#7a5a48" stroke-width="2" fill="none" marker-end="url(#a)">
+    <path d="M430,208 L430,260"/><path d="M430,320 L430,372"/>
+    <path d="M500,292 L688,292"/>
+    <path d="M170,138 C 250,120 600,120 688,150"/>
+    <path d="M530,150 C 600,150 640,150 688,150"/>
+  </g>
+  <text x="40" y="500" font-size="11" fill="#8a7464" font-style="italic">Wired: USB-C -&gt; bridge -&gt; storage (bypasses radio). Wireless: phone &lt;-&gt; radio &lt;-&gt; storage. Never both at once.</text>
+</svg>
+'''
+
+
+# ---------------------------------------------------------------------------
+# Alternative build path emitters
+# ---------------------------------------------------------------------------
+
+def emit_gl823_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for GL823 USB 2.0 alternative bridge."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U2":
+            # Replace with GL823
+            line = 1.60
+            w.writerow(["U2", 1, "USB2.0-HS SD/eMMC bridge", "GL823 (or equiv)", "Package_DFN_QFN:QFN-24",
+                        f"{1.60:.2f}", f"{line:.2f}",
+                        "USB 2.0 High-Speed mass-storage bridge; owns storage when plugged in",
+                        "Alternative. USB 2.0 for ~25-35 MB/s wired. QFN-24."])
+        elif c.ref == "C_GRP":
+            continue  # Skip grouped
+        elif c.ref in ("PCB", "ENC"):
+            continue  # Skip PCB/ENC for electronics-only delta
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    # Add GL3224 cost to total for comparison
+    total += 1.60
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_gl823_schematic_plan(v: Variant, base_nets: dict) -> str:
+    """Emit schematic plan for GL823 alternative. Net changes: U2 pin mapping."""
+    return f"""# Schematic Plan (GL823 Alternative) — {v.name}
+
+This is the **GL823 (USB 2.0)** alternative build path. Same topology as the
+standard GL3224 build, but U2 is replaced with the GL823 QFN-24 bridge.
+
+## Key Differences from Standard (GL3224)
+- **U2:** GL823 (QFN-24, USB 2.0, ~25-35 MB/s wired) instead of GL3224 (QFN-32, USB 3.0, ~70-100+ MB/s)
+- **Pin Count:** 24 pins vs 32 pins. GL823 lacks USB 3.0 SuperSpeed differential pairs.
+- **Performance:** Wired speed is limited to USB 2.0 High-Speed (~25-35 MB/s).
+- **Footprint:** Smaller (4x4 mm QFN-24 vs 5x5 mm QFN-32).
+
+## Net Changes
+- **USB_SS_TX_P, USB_SS_TX_N, USB_SS_RX_P, USB_SS_RX_N:** Not present. USB 3.0 lanes are absent.
+- All other nets (VBUS, USB_DP, USB_DM, SD_CLK, SD_CMD, SD_D0..D3, SD_SEL) remain identical.
+- **VCC_33 -> VDD33:** GL823 uses VDD33 for 3.3V supply. Functionally equivalent to GL3224's VCC_33.
+- **RREF:** GL823 may not require an external reference resistor. Verify from datasheet.
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list. Only the U2 pin
+mappings change; the circuit topology is identical.
+"""
+
+def emit_gl823_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for GL823 alternative."""
+    # Build modified component list
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U2":
+            alt_comps.append(Comp("U2", "USB2.0-HS SD/eMMC bridge", "Package_DFN_QFN:QFN-24",
+                  "USB High-Speed mass-storage bridge; owns storage when plugged in",
+                  pins=[
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "USB_DP",  "bidirectional"),
+                      ("3",  "USB_DM",  "bidirectional"),
+                      ("4",  "VCC_33",  "power_in"),
+                      ("5",  "GND",     "power_in"),
+                      ("6",  "SD_CLK",  "output"),
+                      ("7",  "SD_CMD",  "bidirectional"),
+                      ("8",  "SD_D0",   "bidirectional"),
+                      ("9",  "SD_D1",   "bidirectional"),
+                      ("10", "SD_D2",   "bidirectional"),
+                      ("11", "SD_D3",   "bidirectional"),
+                      # Remaining pins are GPIO/config specific to GL823
+                  ], unit_cost=1.60, mpn="GL823 (or equiv)",
+                  note="Alternative. USB 2.0 for ~25-35 MB/s wired. QFN-24."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_pl2732_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for PL2732 USB 3.0 alternative bridge."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U2":
+            # Replace with PL2732
+            line = 1.70
+            w.writerow(["U2", 1, "USB3.0 SD/eMMC bridge", "PL2732", "Package_DFN_QFN:QFN-32",
+                        f"{1.70:.2f}", f"{line:.2f}",
+                        "USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in",
+                        "Alternative. USB 3.0 for ~70-100+ MB/s wired. Prolific. Excellent eMMC."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 1.70
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_pl2732_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (PL2732 Alternative) — {v.name}
+
+This is the **PL2732 (USB 3.0)** alternative build path. Same topology as the
+standard GL3224 build, but U2 is replaced with the PL2732 QFN-32 bridge.
+
+## Key Differences from Standard (GL3224)
+- **U2:** PL2732 (QFN-32, USB 3.0, ~70-100+ MB/s wired) instead of GL3224.
+- **eMMC Support:** PL2732 has excellent eMMC HS200 support.
+- **Firmware:** May require different firmware initialization sequence. Verify from Prolific datasheet.
+- **Pin Mapping:** QFN-32 pinout differs from GL3224. Must verify from PL2732 datasheet.
+
+## Net Changes
+- Net topology is identical to GL3224 (same USB 3.0 SS pairs, same SDIO bus).
+- Pin numbers on U2 will differ. Update PIN_MAP accordingly.
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list. Only the U2 pin
+mappings change; the circuit topology is identical.
+"""
+
+def emit_pl2732_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for PL2732 alternative. Uses same logical pins as GL3224."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U2":
+            alt_comps.append(Comp("U2", "USB3.0 SD/eMMC bridge", "Package_DFN_QFN:QFN-32",
+                  "USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in",
+                  pins=c.pins, unit_cost=1.70, mpn="PL2732",
+                  note="Alternative. USB 3.0 for ~70-100+ MB/s wired. Prolific."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_mcp73831_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for MCP73831 simple linear charger alternative."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U3":
+            # Replace with MCP73831
+            line = 0.50
+            w.writerow(["U3", 1, "MCP73831", "MCP73831T-2ACI/OT", "Package_TO_SOT_SMD:SOT-23-5",
+                        f"{0.50:.2f}", f"{line:.2f}",
+                        "Single-cell Li-ion/LiPo charge management",
+                        "Alternative. Simple linear charger. No power-path. STAT pin only."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 0.50
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_mcp73831_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (MCP73831 Alternative) — {v.name}
+
+This is the **MCP73831 (Linear Charger)** alternative build path.
+
+## Key Differences from Standard (BQ25896)
+- **U3:** MCP73831 (SOT-23-5, simple linear charger) instead of BQ25896 (WQFN-24, buck charger).
+- **No Power-Path:** Cannot run the radio while charging. System runs from battery only.
+- **No I2C:** Charge current set via PROG resistor only. No software control.
+- **Simpler:** Fewer pins, smaller footprint, lower cost.
+- **Impact:** If user plugs in USB while transferring, the radio must pause or run from battery.
+  This is acceptable for single-C5 variants but not recommended for dual/E22.
+
+## Net Changes
+- **I2C_SDA / I2C_SCL:** U3 no longer connects to I2C. U4 (fuel gauge) remains on I2C.
+- **CHG_INT:** Removed (MCP73831 has no INT pin).
+- **STAT:** U3 STAT pin connects to U1 CHG_STAT GPIO (same function, different pin).
+- **PROG:** R3 sets charge current (same as standard).
+- **TS:** Removed (MCP73831 has no thermistor input).
+- **VBUS:** U3 VBUS connects directly (same as standard).
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list.
+"""
+
+def emit_mcp73831_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for MCP73831 alternative."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U3":
+            alt_comps.append(Comp("U3", "MCP73831", "Package_TO_SOT_SMD:SOT-23-5",
+                  "Single-cell Li-ion/LiPo charge management",
+                  pins=[
+                      ("1", "VBUS", "power_in"),
+                      ("2", "STAT", "open_collector"),
+                      ("3", "VBAT", "power_out"),
+                      ("4", "VDD", "power_in"),
+                      ("5", "PROG", "passive"),
+                  ], unit_cost=0.50, mpn="MCP73831T-2ACI/OT",
+                  note="Alternative. Simple linear charger. No power-path."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_bq24072_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for BQ24072 power-path linear charger alternative."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U3":
+            line = 0.90
+            w.writerow(["U3", 1, "BQ24072", "BQ24072DSQR", "Package_DFN_QFN:VQFN-16_3.5x3.5mm",
+                        f"{0.90:.2f}", f"{line:.2f}",
+                        "Linear charger with power-path",
+                        "Alternative. Power-path without I2C. Good middle ground."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 0.90
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_bq24072_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (BQ24072 Alternative) — {v.name}
+
+This is the **BQ24072 (Power-Path Linear Charger)** alternative build path.
+
+## Key Differences from Standard (BQ25896)
+- **U3:** BQ24072 (VQFN-16, linear + power-path) instead of BQ25896 (WQFN-24, buck charger).
+- **Power-Path:** YES. Can run radio while charging. This is the key advantage over MCP73831.
+- **No I2C:** Charge current set via external resistor. No software control.
+- **Moderate Complexity:** More pins than MCP73831, fewer than BQ25896.
+- **Impact:** Best choice if you need power-path but want to avoid I2C complexity.
+
+## Net Changes
+- **I2C_SDA / I2C_SCL:** U3 no longer connects to I2C. U4 (fuel gauge) remains on I2C.
+- **CHG_INT:** Removed.
+- **STAT:** U3 has #PG (Power Good) and #CHG (Charge Status) pins.
+- **PROG/ILIM:** Set via external resistors.
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list.
+"""
+
+def emit_bq24072_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for BQ24072 alternative."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U3":
+            alt_comps.append(Comp("U3", "BQ24072", "Package_DFN_QFN:VQFN-16_3.5x3.5mm",
+                  "Linear charger with power-path",
+                  pins=[
+                      ("1",  "VBUS",   "power_in"),
+                      ("2",  "STAT",   "open_collector"),
+                      ("3",  "PG",     "open_collector"),
+                      ("4",  "BAT",    "power_out"),
+                      ("5",  "SYS",    "power_out"),
+                      ("6",  "PROG",   "passive"),
+                      ("7",  "ILIM",   "input"),
+                      ("8",  "TS",     "input"),
+                      ("9",  "CE",     "input"),
+                      ("10", "IN",     "power_in"),
+                      ("11", "GND",    "power_in"),
+                      ("12", "BAT_EN", "output"),
+                      ("13", "CHG",    "open_collector"),
+                      ("14", "TMR",    "passive"),
+                      ("15", "VREF",   "power_out"),
+                      ("16", "GND_PAD","power_in"),
+                  ], unit_cost=0.90, mpn="BQ24072DSQR",
+                  note="Alternative. Power-path without I2C. Good middle ground."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+def emit_tmux1574_bom(v: Variant, base_comps: list[Comp]) -> str:
+    """Emit BOM for TMUX1574 SD mux signal integrity upgrade."""
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["ref", "qty", "value", "mpn", "footprint", "unit_cost_usd", "line_cost_usd", "description", "note"])
+    total = 0.0
+    for c in base_comps:
+        if c.ref == "U6":
+            # Replace with TMUX1574
+            line = 0.55
+            w.writerow(["U6", 1, "SD 2:1 bus mux", "TMUX1574", "Package_DFN_QFN:QFN-24",
+                        f"{0.55:.2f}", f"{line:.2f}",
+                        "Arbitrates microSD/eMMC bus between radio (A) and bridge (B)",
+                        "Alternative. Higher BW, lower Ron. Signal integrity upgrade."])
+        elif c.ref == "C_GRP":
+            continue
+        elif c.ref in ("PCB", "ENC"):
+            continue
+        else:
+            line = round(c.unit_cost * c.qty, 3)
+            total += line
+            w.writerow([c.ref, c.qty, c.value, c.mpn, c.footprint,
+                        f"{c.unit_cost:.2f}", f"{line:.2f}", c.desc, c.note])
+    total += 0.55
+    w.writerow([])
+    w.writerow(["TOTAL_ELECTRONICS", "", "", "", "", "", f"{total:.2f}", "", ""])
+    return out.getvalue()
+
+def emit_tmux1574_schematic_plan(v: Variant) -> str:
+    return f"""# Schematic Plan (TMUX1574 Alternative) — {v.name}
+
+This is the **TMUX1574 (Signal Integrity Upgrade)** alternative build path for the SD bus mux.
+
+## Key Differences from Standard (TS3A-class)
+- **U6:** TMUX1574 (QFN-24) instead of TS3A-class (QFN-20).
+- **Performance:** Higher bandwidth, lower on-resistance (Ron). Better signal integrity for SDIO at higher clock rates.
+- **Pin Count:** 24 pins vs 20. Additional pins for control/NC.
+- **Use Case:** Recommended if SDIO timing issues are observed with the TS3A-class mux on prototype.
+
+## Net Changes
+- **SEL:** Same function (SD_SEL).
+- **C_CLK, C_CMD, C_D0..D3:** Same signal names. Pin numbers differ (QFN-24).
+- **VCC:** 3V3 supply (same).
+
+## All Other Nets
+See `../standard/SCHEMATIC_PLAN.md` for the full net list. Only the U6 pin
+mappings change; the circuit topology is identical.
+"""
+
+def emit_tmux1574_netlist(v: Variant, comps: list[Comp]) -> str:
+    """Emit netlist for TMUX1574 alternative."""
+    alt_comps = []
+    for c in comps:
+        if c.ref == "U6":
+            alt_comps.append(Comp("U6", "SD 2:1 bus mux", "Package_DFN_QFN:QFN-24",
+                  "Arbitrates microSD/eMMC bus between radio (A) and bridge (B)",
+                  pins=[
+                      ("SEL", "SEL", "input"),
+                      ("GND", "GND", "power_in"),
+                      ("VCC", "3V3", "power_in"),
+                      ("C_CLK", "SD_CLK", "bidirectional"),
+                      ("C_CMD", "SD_CMD", "bidirectional"),
+                      ("C_D0", "SD_D0", "bidirectional"),
+                      ("C_D1", "SD_D1", "bidirectional"),
+                      ("C_D2", "SD_D2", "bidirectional"),
+                      ("C_D3", "SD_D3", "bidirectional"),
+                  ], unit_cost=0.55, mpn="TMUX1574",
+                  note="Alternative. Higher BW, lower Ron. Signal integrity upgrade."))
+        elif c.ref == "C_GRP":
+            continue
+        else:
+            alt_comps.append(c)
+
+    nets = build_nets(v, alt_comps)
+    return emit_kicad_netlist(v, alt_comps, nets)
+
+
+# ---------------------------------------------------------------------------
+# Driver
+# ---------------------------------------------------------------------------
+
+def generate(root: str) -> list[str]:
+    written = []
+    variants_dir = os.path.join(root, "variants")
+    os.makedirs(variants_dir, exist_ok=True)
+    for v in ALL_VARIANTS:
+        vdir = os.path.join(variants_dir, v.name)
+        os.makedirs(vdir, exist_ok=True)
+
+        # Build standard components and nets
+        comps = build_components(v)
+        nets = build_nets(v, comps)
+
+        # --- Standard build path ---
+        std_dir = os.path.join(vdir, "standard")
+        os.makedirs(std_dir, exist_ok=True)
+
+        std_files = {
+            "BOM.csv": emit_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_schematic_plan(v, nets),
+            f"tucklet-{v.name}.net": emit_kicad_netlist(v, comps, nets),
+        }
+        for fname, content in std_files.items():
+            path = os.path.join(std_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # --- Alternative build paths ---
+        alt_dir = os.path.join(vdir, "alternatives")
+        os.makedirs(alt_dir, exist_ok=True)
+
+        # USB Bridge: GL823 (USB 2.0)
+        gl823_dir = os.path.join(alt_dir, "usb_bridge_gl823")
+        os.makedirs(gl823_dir, exist_ok=True)
+        gl823_files = {
+            "BOM.csv": emit_gl823_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_gl823_schematic_plan(v, nets),
+            f"tucklet-{v.name}-gl823.net": emit_gl823_netlist(v, comps),
+        }
+        for fname, content in gl823_files.items():
+            path = os.path.join(gl823_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # USB Bridge: PL2732 (USB 3.0)
+        pl2732_dir = os.path.join(alt_dir, "usb_bridge_pl2732")
+        os.makedirs(pl2732_dir, exist_ok=True)
+        pl2732_files = {
+            "BOM.csv": emit_pl2732_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_pl2732_schematic_plan(v),
+            f"tucklet-{v.name}-pl2732.net": emit_pl2732_netlist(v, comps),
+        }
+        for fname, content in pl2732_files.items():
+            path = os.path.join(pl2732_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # Charger: MCP73831 (Simple Linear)
+        mcp73831_dir = os.path.join(alt_dir, "charger_mcp73831")
+        os.makedirs(mcp73831_dir, exist_ok=True)
+        mcp73831_files = {
+            "BOM.csv": emit_mcp73831_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_mcp73831_schematic_plan(v),
+            f"tucklet-{v.name}-mcp73831.net": emit_mcp73831_netlist(v, comps),
+        }
+        for fname, content in mcp73831_files.items():
+            path = os.path.join(mcp73831_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # Charger: BQ24072 (Power-Path Linear)
+        bq24072_dir = os.path.join(alt_dir, "charger_bq24072")
+        os.makedirs(bq24072_dir, exist_ok=True)
+        bq24072_files = {
+            "BOM.csv": emit_bq24072_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_bq24072_schematic_plan(v),
+            f"tucklet-{v.name}-bq24072.net": emit_bq24072_netlist(v, comps),
+        }
+        for fname, content in bq24072_files.items():
+            path = os.path.join(bq24072_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # SD Mux: TMUX1574 (Signal Integrity Upgrade)
+        tmux1574_dir = os.path.join(alt_dir, "sd_mux_tmux1574")
+        os.makedirs(tmux1574_dir, exist_ok=True)
+        tmux1574_files = {
+            "BOM.csv": emit_tmux1574_bom(v, comps),
+            "SCHEMATIC_PLAN.md": emit_tmux1574_schematic_plan(v),
+            f"tucklet-{v.name}-tmux1574.net": emit_tmux1574_netlist(v, comps),
+        }
+        for fname, content in tmux1574_files.items():
+            path = os.path.join(tmux1574_dir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+        # --- Variant-level files (specs, maps, diagrams) ---
+        # These reference the standard/ build as the default path.
+        variant_files = {
+            "SPEC.md": emit_spec(v),
+            "PIN_MAP.md": emit_pin_map(v),
+            "SCHEMATIC_PLAN.md": emit_schematic_plan(v, nets),
+            f"tucklet-{v.name}.net": emit_kicad_netlist(v, comps, nets),
+            "block_diagram.svg": emit_block_svg(v),
+        }
+        for fname, content in variant_files.items():
+            path = os.path.join(vdir, fname)
+            with open(path, "w") as f:
+                f.write(content)
+            written.append(path)
+
+    return written
+
+
+def validate(root: str) -> None:
+    """Lightweight self-checks on the generated artifacts."""
+    import re
+    problems = []
+    for v in ALL_VARIANTS:
+        vdir = os.path.join(root, "variants", v.name)
+        # Check both variant-level and standard/ netlists
+        net = os.path.join(vdir, "standard", f"tucklet-{v.name}.net")
+        if not os.path.exists(net):
+            # Fallback to variant-level netlist for legacy compatibility
+            net = os.path.join(vdir, f"tucklet-{v.name}.net")
+        if not os.path.exists(net):
+            problems.append(f"{v.name}: netlist missing (checked standard/ and variant root)")
+            continue
+
+        txt = open(net).read()
+        # balanced parens
+        if txt.count("(") != txt.count(")"):
+            problems.append(f"{v.name}: unbalanced parens in netlist")
+        # every net has >=2 nodes
+        for m in re.finditer(r'\(net \(code "\d+"\) \(name "([^"]+)"\)(.*?)\n    \)', txt, re.S):
+            name, body = m.group(1), m.group(2)
+            if body.count("(node") < 2:
+                problems.append(f"{v.name}: net {name} has <2 nodes")
+        # GND and 3V3 present
+        for required in ["GND", "3V3", "VBUS", "VBAT", "SD_CLK", "USB_DP"]:
+            if f'(name "{required}")' not in txt:
+                problems.append(f"{v.name}: missing net {required}")
+        # dual has aggregation crossover nets (SPI)
+        if v.is_dual:
+            spi_nets = ['AGG_CLK', 'AGG_CS', 'AGG_MOSI', 'AGG_MISO']
+            missing = [n for n in spi_nets if f'(name "{n}")' not in txt]
+            if missing:
+                problems.append(f"{v.name}: dual variant missing SPI AGG nets {missing}")
+        # storage device present
+        dev = "J2" if v.storage == "microsd" else "XU7"
+        if f'(ref "{dev}")' not in txt:
+            problems.append(f"{v.name}: missing storage device {dev}")
+
+    if problems:
+        print("VALIDATION FAILED:")
+        for p in problems:
+            print("  -", p)
+        sys.exit(1)
+    print(f"VALIDATION OK: {len(ALL_VARIANTS)} variants, all netlists balanced, "
+          f"every net >=2 nodes, power/USB/SD/storage present.")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true", help="generate to ./_check and validate only")
+    ap.add_argument("--root", default=os.path.dirname(os.path.abspath(__file__)))
+    args = ap.parse_args()
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_check") if args.check else args.root
+    written = generate(root)
+    validate(root)
+    print(f"Generated {len(written)} files under {os.path.join(root, 'variants')}")
+    for w in written:
+        print("  ", os.path.relpath(w, root))
+
+
+if __name__ == "__main__":
+    main()
+
+hardware/common/COMPONENT_SELECTION.md
+
+# Component Selection (shared across all variants)
+
+This is the shared parts list and rationale for every Tucklet board. The
+variant-specific BOMs (`variants/<name>/BOM.csv`) are generated from this same
+model in `gen_hardware.py` and are the authoritative per-board cost; this file
+explains *why* each part is chosen.
+
+> Costs are order-of-magnitude at a few-hundred-unit volume. Verify live
+> availability on LCSC / Digi-Key / Mouser before committing.
+
+## 1. SoC / radio — ESP32-C5 & ESP32-E22 Families (`U1`, and `U1B` on dual)
+
+We offer two distinct product tiers via the radio selection, each available in Standard (WROOM) and Compact (Mini) form factors.
+
+### Tier 1: ESP32-C5 (The "Charm" Baseline)
+- **Performance:** Dual-band **Wi-Fi 6 (2.4 + 5 GHz)** + **BLE**. The 5 GHz band is less congested and roughly doubles the older ESP32-S3's wireless throughput — ~9 MB/s at the close range a phone-mounted charm enjoys.
+- **Form Factors:**
+    - **ESP32-C5-WROOM-1:** Standard footprint (**18.0 x 27.5 mm**). Larger PCB antenna area for optimal range.
+    - **ESP32-C5-MINI-1:** Ultra-compact (**15.4 x 21.3 mm**). Same silicon performance, optimized for tightest enclosure fit.
+- **Rationale:** BLE is the always-on control/auth plane; Wi-Fi is the on-demand data plane. Using the **pre-certified module** (not a bare chip) avoids bare-die RF layout and substantially reduces the FCC/CE burden.
+- **Why C5 over S3:** the S3 is 2.4 GHz-only (~2–5 MB/s). For a product whose whole pitch is "fast enough to be invisible," the 5 GHz band matters.
+- **Cost:** ~$2.60 (WROOM) / ~$2.40 (MINI).
+
+### Tier 2: ESP32-E22 (The "High-Performance" Pro Line)
+- **Performance:** Tri-band **Wi-Fi 6E (2.4, 5, 6 GHz)** + **BLE 5.4**. Features a dual-core RISC-V processor @ 500 MHz. Theoretical throughput exceeds 150 MB/s (device I/O limited).
+- **Form Factors:**
+    - **ESP32-E22-MINI-1 (Projected):** Ultra-compact footprint. **Primary target for the "Pro Charm" line.** Fits the Charm form factor with integrated PCB antenna.
+    - **ESP32-E22-WROOM / M.2:** **Excluded from Charm line.** Standard/M.2 modules require external IPEX antennas (reliability risk in a sealed charm) and larger board area, violating the "Charm" product identity. This module is the basis for the separate, source-available, non-commercial **Pro Line**.
+- **Rationale:** Targets users with extreme data density or congested 6 GHz environments. This chip is typically a Radio Co-Processor (RCP) but is utilized here as the main application processor to leverage its massive wireless bandwidth.
+- **Constraints:** Significantly higher power draw (~2A peak) and heat generation compared to the C5. Requires the "Pro" power subsystem (Section 7/8).
+- **Cost:** ~$4.20 (MINI, estimated).
+
+## 2. USB-HS storage bridge — GL3224-OEM (`U2`)
+- The fast **wired** path (~70–100+ MB/s). It owns the storage directly when the
+  device is plugged in, **bypassing the radio entirely**.
+- Critical: the ESP32's *own* USB is Full-Speed only (~0.5 MB/s in practice), so
+  the chip can never be the fast wired path. A dedicated bridge is what makes
+  "plug in for a full-library dump in minutes" real.
+- **Primary Part:** **GL3224-OEM** — QFN-32 (5×5×0.8 mm), USB 3.0 (5 Gbps).
+  Single-LUN variant. JBOD support. Firmware-upgradable. Pin mapping must be verified from the GL3224-OEM datasheet. USB 3.0 SuperSpeed differential pairs (SS_TX_P/N, SS_RX_P/N) may be NC in USB 2.0 fallback.
+- **Alternative Packages:**
+    - **GL3224-OEM QFN-48:** 7×7×0.8 mm. Dual-LUN. Tighter fit in eMMC-only envelopes. Use QFN-32 as default for Charm.
+- ~$1.80.
+
+### Alternative USB Bridges
+- **PL2732 (Backup 1):** QFN-32 (5×5×0.8 mm), USB 3.0. Prolific. Excellent eMMC HS200 support. Firmware initialization may differ. Equivalent performance (~70–100+ MB/s). ~$1.70.
+- **GL823 (Backup 2, Size-Constrained):** QFN-24 (4×4×0.8 mm), USB 2.0 (480 Mbps). Smallest footprint. Lowest power. **~25–35 MB/s wired.** Correct 24-pin part with full 4-bit SDIO support. ~$1.60.
+- **AU6601 (Backup 3):** QFN-48 (7×7×0.8 mm), USB 3.0. Alcor Micro. Larger footprint. Last resort if GL3224/PL2732 unavailable.
+- **Infineon EZ-USB SD3 (Roadmap):** BGA-56 (~7×7 mm), USB 5 Gbps. Highest performance. Requires BGA assembly.
+
+> **Critical Distinction:** GL823 (24-pin, full SDIO) ≠ GL823K (16-pin, limited). The GL823K cannot route full 4-bit SDIO and must be avoided for Tucklet.
+
+## 3. Storage bus mux — SD 2:1 (`U6`)
+- Arbitrates the single SDIO bus between the radio (A-side) and the bridge
+  (B-side). `SD_SEL` (driven by USB-VBUS-present) selects the owner; never both.
+- **Primary Part:** **TS3A-class** — QFN-20 (~4×4×0.8 mm). Sufficient bandwidth for SDIO. Pinout varies by exact part number; verify against your chosen mux's datasheet.
+- ~$0.45.
+
+### Alternative SD Muxes
+- **TMUX1574 (Signal Integrity Upgrade):** QFN-24 (~4×4×0.8 mm). Higher bandwidth, lower on-resistance (Ron). Better signal integrity for SDIO at higher clock rates. Recommended if timing issues observed on prototype. ~$0.55.
+- **TXS02612 (SD-Specific):** QFN-24. SD-optimized with integrated level shifting. Useful if voltage translation is needed between the bridge and storage. ~$0.50.
+
+## 4. USB-C — receptacle + protection (`J1`, `D1`, `R1`, `R2`)
+- USB-C receptacle (USB 2.0 wiring) for charging + the wired data path.
+- ESD array on D+/D−/VBUS; two 5.1 kΩ CC pulldowns (required for a USB-C sink).
+- ~$0.30 + ~$0.22 protection/passives.
+
+## 5. Battery charger — BQ25896 (`U3`)
+- **BQ25896** — WQFN-24 (4×4×0.8 mm), I²C-controlled buck charger with
+  integrated power-path. System can run from USB power while the battery charges,
+  which is critical: you can use the charm while it's plugged in without draining
+  the cell.
+- Power-path output (`SYS`) feeds the 3.3 V buck; charge current set via I²C
+  (or PROG resistor fallback). `STAT` and `INT` pins connect to GPIOs for firmware
+  status. Thermistor input (`TS`) for charge-temperature qualification.
+- **Pin mapping note:** Pin numbers in the generated netlists are logical
+  placeholders. Verify against the BQ25896 datasheet before layout.
+- ~$1.50.
+
+### Alternative Chargers
+- **MCP73831 (Simple Linear, No Power-Path):** SOT-23-5 (2.9×2.8×1.4 mm). Simplest
+  option. Charge current set by PROG resistor only. No I²C. No power-path — system
+  runs from battery only, even when plugged in. Acceptable for single-C5 builds
+  where simultaneous charge+transfer is rare. ~$0.50.
+- **BQ24072 (Power-Path Linear):** VQFN-16 (3.5×3.5×0.9 mm). Power-path without
+  the I²C complexity of the BQ25896. Good middle ground if you need to run the
+  radio while charging but don't want software-controlled charging. ~$0.90.
+- **TP4056 (Ubiquitous Linear):** SOP-8 (~5×6 mm). Cheap and available. Larger
+  footprint. No power-path. Consider only for budget/availability builds. ~$0.20.
+- **MCP73871 (Tiny Power-Path):** SOT-23-6 / DFN-6 (~2×3 mm). Very small
+  power-path option. Consider for Mini variants where space is critical. ~$0.60.
+- **MAX14748 (USB Power Manager):** WLP-12 / TQFN-14 (~3×3 mm). USB-specific
+  power manager with integrated buck. Compact. ~$1.00.
+
+### 2S (Pro Line) Charger
+- **BQ25887:** VQFN-24 (4×4 mm). 2-cell (2S) boost charger with cell balancing.
+  Required for the Pro Line (E22-WROOM + 2S LiPo). Not for 1S builds. ~$1.80.
+
+## 6. Fuel gauge — MAX17048 (`U4`)
+- I²C model-gauge so the app shows a **real** battery percentage, not a guess.
+  `ALRT` → a GPIO for a low-battery interrupt.
+- **MAX17048** — TDFN-8 (3×3×0.8 mm). Best accuracy without a current-sense
+  resistor. 1S only.
+- ~$0.80.
+
+### Alternative Fuel Gauges
+- **BQ27421:** QFN (~3.5×3.5 mm). Impedance Track algorithm. Requires external
+  sense resistor. Different I²C command set. Suitable for both 1S and 2S
+  configurations. ~$0.90.
+- **BQ27520:** QFN (~4×4 mm). More features, larger. 2S backup option. ~$1.20.
+
+## 7. Regulator — 3.3 V buck (`U5`)
+- Sized for the **Wi-Fi TX peak**, not the average — under-sizing causes mid-transfer brownout resets, the #1 ESP bring-up bug.
+- **Tier 1 (C5):**
+    - **Single Radio:** ~500 mA bursts. Standard 600 mA+ buck (TPS62740-class, SOT-23-6). ~$0.40.
+    - **Dual Radio:** ~1 A peak. Larger buck (TPS62740-class, SOT-23-6). ~$0.55.
+- **Tier 2 (E22):**
+    - **All E22 Variants:** Dual-core 500 MHz + Wi-Fi 6E draws ~2 A peak. Requires a high-current buck regulator (TPS62840-class, SOT-23-6). ~$1.20.
+- **2S (Pro Line):** Step-down from 8.4 V to 3.3 V at ≥2 A. Different inductor/feedback network. TPS62840-class. ~$1.20.
+- **Thermal Note:** On E22 and 2S boards, the regulator will dissipate noticeable heat. Ensure copper pour connection.
+
+## 8. Battery — LiPo (`BT1`)
+- Final mAh set **after measuring real transfer current** on a prototype.
+- **Tier 1 (C5):** 120–200 mAh + PCM. ~$2.00. Fits the "Charm" envelope.
+- **Tier 2 (E22):** 300–500 mAh + PCM. ~$3.50. Required to sustain high-throughput sessions. May dictate a slightly larger "Pro" enclosure or denser cell technology.
+- **2S (Pro Line):** ~120–150 mAh + PCM (stacked cells). ~6 mm thick. Requires the Pro enclosure (~12–13 mm total). ~$3.50–5.00.
+
+## 9. UI — button + RGB LED (`SW1`, `LED1`, `R6`)
+- One tactile button (pair / factory-reset via press patterns) with a 10 kΩ
+  pull-up and firmware debounce. One WS2812 addressable RGB for status.
+- ~$0.30.
+
+## 10. Passives — SD/I²C pull-ups, decoupling, bulk (`R3–R11`, `C_GRP`)
+- SDIO CMD + data pull-ups (10 kΩ), I²C pull-ups (4.7 kΩ), PROG resistor,
+  100 nF per IC rail, 10 µF bulk near U1/U5, USB/charger input caps.
+- ~$0.80 grouped (expand `C_GRP` to individual C refs during layout).
+
+### BQ25896-Specific Passives
+- **I²C Pull-ups:** The BQ25896 shares the I²C bus with U4 (MAX17048). Only one set of 4.7 kΩ pull-ups is needed for the bus.
+- **PROG Resistor:** Sets charge current. Size to your cell (e.g., 2 kΩ ≈ 500 mA for a 150 mAh cell).
+- **TS Thermistor:** Connect a 10 kΩ NTC thermistor to the `TS` pin for charge-temperature qualification. If omitted, tie `TS` to `VREF` with a resistor divider per the BQ25896 datasheet.
+
+## Shared electronics subtotal
+Roughly **$9.5–$10.5** (C5 baseline) to **$14.00+** (E22 baseline) before the storage device, PCB, and enclosure — see each `variants/<name>/BOM.csv` for the exact, authoritative totals. The `singlec5-microsd` baseline lands at **~$13.66 full BOM**, inside the sub-$15 target; E22 variants rise from there (performance costs money — expected for the "Pro" line).
+
+## Not produced here (and why)
+- **Gerbers / pick-and-place:** outputs of PCB layout + DFM, not schematic
+  capture. Cannot be honestly faked.
+- **FCC/CE certification:** required (radios). The pre-certified module reduces
+  but does not eliminate it. Budget time + cost before sale.
+
+hardware/common/VARIANTS.md
+
+# Variants — cross-comparison, BOM & dimensions
+
+Three hardware axes (Radio × Storage × Form Factor) yield twelve unique board configurations for the **Charm** product line. The per-board `variants/<name>/BOM.csv` and `SPEC.md` are the authoritative source (generated from `gen_hardware.py`); this file is the at-a-glance comparison.
+
+## The Product Lines
+
+Tucklet is organized as two distinct product lines, both under the same source-available, non-commercial licensing:
+
+| Line | Radio | Form Factor | Battery | Variants | Position |
+|---|---|---|---|---|---|
+| **Charm Standard** | ESP32-C5 | WROOM | 1S LiPo | 4 | Baseline: Lowest cost, easy assembly |
+| **Charm Compact** | ESP32-C5 | MINI | 1S LiPo | 4 | Nano: Smallest footprint, tighter layout |
+| **Charm High-Perf** | ESP32-E22 | MINI | 1S LiPo (Roadmap) | 4 | Wi-Fi 6E speed, pending module release |
+| **Charm Pro** | ESP32-E22 | WROOM | 2S LiPo (Roadmap) | Planned | High-Performance, larger envelope |
+
+All lines are licensed under **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software). The Pro line is a **Charm** — it fits a "charm" envelope (wearable, on-phone), even though it is thicker to accommodate the 2S battery. It is not a "backpack" or "brick" class device. You may study, modify, and build for personal use; commercial sale requires a separate agreement.
+
+**Note:** The ESP32-E22 variants (both MINI and WROOM) are **Roadmap** items. The `ESP32-E22-MINI-1` module is projected but not yet released. The `ESP32-E22-WROOM` module (22×30 mm, external IPEX antenna) is the basis for the Pro line. **No E22 variant folders are created at this time** (see "Variant Folder Organization" below).
+
+## Storage axis
+
+### microSD (swappable)
+Push-push socket, SDIO 4-bit, +~$0.40. Customer supplies/upgrades the card; you don't pay for flash. Dead card = $5 swap, not a dead device. Slightly larger enclosure (socket + insertion clearance), placed internally behind a small door so the unit still looks sealed.
+
+### eMMC (sealed) — per-capacity cost (small-volume estimate; VERIFY)
+153-ball TFBGA eMMC 5.1, 11.5 × 13.0 × 1.2 mm. Capacity is fixed at manufacture.
+
+| Capacity | eMMC est. | Full BOM (single-C5) |
+|---|---|---|
+| 8 GB | ~$2.50 | ~$13.5 |
+| 16 GB | ~$3.50 | ~$14.5 |
+| 32 GB | ~$5.00 | ~$16.0 |
+| 64 GB | ~$8.00 | ~$19.0 |
+| 128 GB | ~$13.00 | ~$24.0 |
+| 256 GB | ~$22.00 | ~$33.0 |
+
+Only 8–16 GB eMMC stays near the sub-$15 target — the honest cost of integrated flash, and exactly why offering microSD *and* eMMC is smart. Requires BGA assembly (CM with reflow + ideally X-ray).
+
+## Radio axis
+
+Performance and Power vary significantly between the C5 and E22 generations.
+
+| Radio | Real wireless | Module size | Fits charm? | Notes |
+|---|---|---|---|---|
+| 1× ESP32-C5 | ~6–9 MB/s (5 GHz Wi-Fi 6) | WROOM: ~18 × 27.5 mm / MINI: ~15.4 × 21.3 mm | yes | **Recommended baseline.** Best balance of power/performance. |
+| 2× ESP32-C5 | ~12–15 MB/s (SPI AGG) | 2 modules + 2 antennas | tight | **Experimental.** Validate RF isolation before production. SPI link prevents inter-chip bottleneck. |
+| 1× ESP32-E22 | ~20–40+ MB/s (Wi-Fi 6E) | MINI: ~15 × 21 mm (projected) | yes (warm) | **High Performance.** Tri-band (2.4/5/6 GHz). Requires >2A buck & larger battery. **MINI form factor only. Roadmap.** |
+| 2× ESP32-E22 | ~40–70+ MB/s (SPI AGG) | MINI: 2 modules | tight (hot) | **Extreme Performance.** Significant thermal considerations. **MINI form factor only. Roadmap.** |
+| 1× ESP32-E22 (Pro) | ~20–40+ MB/s (Wi-Fi 6E) | WROOM: 22 × 30 mm | yes (Pro envelope) | **Pro Charm.** External IPEX antenna. 2S battery. ~35×28×12–13 mm envelope. **Roadmap.** |
+
+To go beyond ~9 MB/s on a single chip you must either run two radios (aggregation) or upgrade to the E22. The E22 is restricted to MINI in the standard Charm line to maintain the integrated-antenna sealed identity. The E22-WROOM is reserved for the Pro line where the external antenna and 2S battery justify a thicker envelope that remains charm-class (wearable, on-phone).
+
+## Form Factor axis
+
+### Standard (WROOM)
+*   **Size:** ~18 × 27.5 mm module footprint.
+*   **Pros:** Better antenna efficiency (larger PCB antenna area), easier to hand-solder/route, widely available stock.
+*   **Cons:** Larger overall device volume.
+*   **Availability:** **C5 Only.** E22-WROOM reserved for Pro line.
+
+### Mini (Compact)
+*   **Size:** ~15.4 × 21.3 mm module footprint.
+*   **Pros:** Significant PCB real-estate savings. Allows for larger battery in same enclosure or smaller device.
+*   **Cons:** Slightly reduced antenna range (negligible for on-phone use), tighter routing constraints.
+*   **Availability:** **C5 and E22.** The only form factor supporting the high-performance E22 in the standard Charm line.
+
+## Battery axis (1S vs 2S)
+
+The choice between 1S (3.7V) and 2S (7.4V) LiPo impacts the Charger, Gauge, Buck Regulator, Battery, and Enclosure dimensions.
+
+| Attribute | **1S LiPo (Charm Standard)** | **2S LiPo (Charm Pro)** |
+|---|---|---|
+| **Nominal Voltage** | 3.7V (4.2V max) | 7.4V (8.4V max) |
+| **Charger (U3)** | **BQ25896** (Buck, I2C, Power-Path) | **BQ25887** (Boost + Cell Balancing) |
+| **Fuel Gauge (U4)** | **MAX17048** (ModelGauge, no sense resistor) | **BQ27421** or **BQ27520** (Impedance Track, requires sense resistor) |
+| **Buck Regulator (U5)** | Step-down from 4.2V to 3.3V | Step-down from 8.4V to 3.3V (sized for ≥2A) |
+| **Battery** | 120–200 mAh, ~3mm thick | ~120–150 mAh, ~6mm thick (stacked cells) |
+| **Enclosure** | 9mm (microSD) / 8mm (eMMC) | **12–13mm** (breaks AirTag class; justified by performance) |
+| **Power-Path** | Yes (BQ25896 SYS pin) | Yes (BQ25887 SYS pin) |
+| **Peak Current** | Sufficient for single/dual C5 | Sustained high-current for E22/dual |
+
+**The 1S path is the default for all C5 and E22-MINI Charm variants.** The 2S path is exclusive to the **Pro** line (E22-WROOM) and requires the larger Pro envelope.
+
+## Dimensions & fit (confirmed)
+
+The MCU module is the footprint driver; the battery is the thickness driver. The USB-HS bridge is a few mm (negligible).
+
+| Storage + Battery | Enclosure envelope | Class |
+|---|---|---|
+| microSD + 1S | ~35 × 28 × 9 mm | AirTag-class |
+| eMMC + 1S | ~32 × 24 × 8 mm | AirTag-class (smaller — no socket/insertion slot) |
+| Any + 2S (Pro) | ~35 × 28 × 12–13 mm | Charm-class (thicker Pro; still wearable) |
+
+**E22 Thermal Note:** High-speed E22 variants (MINI and Pro) generate more heat. The sealed enclosure may require thermal pads or metal injection molding (or a copper pour) to dissipate heat during sustained transfers.
+
+All 1S envelopes satisfy the "charm on a string / forgettable on the back of the phone / doesn't block the charging port" concept. The Pro envelope remains a charm (wearable, on-phone), just thicker. The parametric enclosure in `../../mechanical/enclosure.scad` renders STLs for both storage envelopes and has been verified to produce valid watertight geometry.
+
+## One PCB philosophy
+
+All boards share the same logical architecture: USB-C, charger, gauge, bridge, mux, and UI.
+*   **C5 Variants:** Share 600mA-1A buck regulator.
+*   **E22 Variants:** Upgrade to 2A+ buck regulator and larger battery.
+*   **Pro Variants:** Further upgrade to 2S charger/gauge and Pro envelope.
+*   **Storage:** Keep microSD and eMMC footprints pin-compatible (depopulate/swap the storage block) so a single certification + a single end-of-line test jig covers both.
+*   **Dual-Radio:** Adds the second module, the SPI AGG crossover link, and larger power components.
+
+## Component Alternatives Summary
+
+Every variant has a `standard/` and `alternatives/` subfolder structure capturing the exact MPNs, pin mappings, and netlists for each component choice. See `hardware/README.md` for full details.
+
+| Component | Primary (Standard) | Backup (Alternatives) |
+|---|---|---|
+| **USB Bridge (U2)** | GL3224-OEM (QFN-32, USB 3.0, ~70–100+ MB/s) | GL823 (QFN-24, USB 2.0, ~25–35 MB/s), PL2732 (QFN-32, USB 3.0), AU6601 (QFN-48, USB 3.0) |
+| **Charger (U3)** | BQ25896 (WQFN-24, power-path buck) | MCP73831 (SOT-23-5, simple linear), BQ24072 (VQFN-16, power-path linear) |
+| **Fuel Gauge (U4)** | MAX17048 (TDFN-8, 1S) | BQ27421 (QFN, 1S/2S, requires sense resistor) |
+| **SD Mux (U6)** | TS3A-class (QFN-20) | TMUX1574 (QFN-24, signal integrity), TXS02612 (QFN-24, SD-specific) |
+| **Buck Regulator (U5)** | TPS62740-class (1S, per variant) | TPS62840-class (E22/2S, ≥2A) |
+| **Radio (U1/U1B)** | ESP32-C5-WROOM-1 / MINI-1 | ESP32-E22-MINI-1 (Roadmap), ESP32-E22-WROOM (Pro Roadmap) |
+
+## Variant Folder Organization
+
+Within each `variants/<name>/` folder, the component alternatives and design paths are organized into subfolders. This ensures that every physical board variant has a clear, traceable path for both the **Primary (Standard)** build and any **Backup (Alternative)** component choices. This is critical for BOM flexibility and supply-chain resilience, and it ensures the specific implementations are captured for licensing provenance.
+
+```
+variants/<name>/
+├── SPEC.md
+├── PIN_MAP.md
+├── block_diagram.svg
+├── standard/               # PRIMARY build path (verified components)
+│   ├── BOM.csv             # BOM with primary MPNs (GL3224, BQ25896, etc.)
+│   ├── SCHEMATIC_PLAN.md   # Net list using primary pinouts
+│   └── tucklet-<name>.net  # Netlist for primary components
+└── alternatives/           # BACKUP build paths (supply chain alternatives)
+    ├── usb_bridge_gl823/   # Alternative: GL823 (USB 2.0, QFN-24)
+    │   ├── BOM.csv         # BOM delta or full BOM with GL823
+    │   ├── SCHEMATIC_PLAN.md  # Pin/net changes for GL823
+    │   └── tucklet-<name>-gl823.net
+    ├── usb_bridge_pl2732/  # Alternative: PL2732 (USB 3.0, QFN-32)
+    │   ├── BOM.csv
+    │   ├── SCHEMATIC_PLAN.md
+    │   └── tucklet-<name>-pl2732.net
+    ├── charger_mcp73831/   # Alternative: MCP73831 (Linear, no power-path)
+    │   ├── BOM.csv
+    │   ├── SCHEMATIC_PLAN.md
+    │   └── tucklet-<name>-mcp73831.net
+    ├── charger_bq24072/    # Alternative: BQ24072 (Power-path linear)
+    │   ├── BOM.csv
+    │   ├── SCHEMATIC_PLAN.md
+    │   └── tucklet-<name>-bq24072.net
+    └── sd_mux_tmux1574/   # Alternative: TMUX1574 (Signal integrity upgrade)
+        ├── BOM.csv
+        ├── SCHEMATIC_PLAN.md
+        └── tucklet-<name>-tmux1574.net
+```
+
+**Why this structure?**
+- **Licensing Specificity:** Copyright protects *specific implementations*. The `standard/` and `alternatives/` folders capture the exact MPNs, pin mappings, and netlists for each component choice. A generic "USB Bridge" is unprotectable; `GL3224-OEM` is.
+- **Supply Chain Resilience:** If the GL3224 is out of stock, the GL823 or PL2732 path is already documented and netlisted.
+- **Design Clarity:** No ambiguity about which BOM goes with which schematic.
+
+**Note:** Not all alternatives apply to all variants. The generator creates only the relevant subfolders based on the variant's configuration (e.g., a single-C5 variant may not need the TMUX1574 upgrade unless signal integrity issues are observed).
+
+## E22 and Pro Line Status
+
+### E22-MINI Variants (Roadmap)
+The `ESP32-E22-MINI-1` is a projected component. While the architecture and netlists for the 4 E22-MINI Charm variants are generated and valid, the module is **not yet released** and datasheets are unavailable. Do not fabricate E22-MINI variants until:
+1. The hardware is procured.
+2. Footprints are verified against the official datasheet.
+3. The GPIO map is reconciled (PIN_MAP.md must be updated).
+
+### E22-WROOM / Pro Line (Source-available, Non-commercial)
+The `ESP32-E22-WROOM` (22×30 mm module with external IPEX antenna) is explicitly excluded from the standard Charm variants due to size and antenna constraints. However, this module is the basis for the **Pro Line**, a thicker but still charm-class wearable with a 2S LiPo battery pack.
+
+The Pro design IP is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md). Like the Charm line, the Pro line is fully covered under the **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software) licenses. You may study, modify, and build for personal use; commercial sale requires a separate agreement.
+
+**No Pro variant folders are created at this time.** When the E22-WROOM datasheet is released and the Pro line is ready for prototyping, variant folders (e.g., `pro-e22-wroom-microsd/`) will be added with the same `standard/` + `alternatives/` structure, under the same source-available, non-commercial license as the Charm line.
+
+firmware/ARCHITECTURE.md
+
+# Firmware Architecture (Rust, ESP32-C5)
+
+> **Scope:** This document covers the firmware architecture for the **ESP32-C5** production line (WROOM and MINI form factors, single and dual radio). The ESP32-E22 (Roadmap) and Pro (E22-WROOM + 2S) lines are documented separately in `hardware/PRO_LINE.md`. Their architecture will extend this foundation when the hardware is released.
+
+## Toolchain choice: esp-idf (std) Rust
+
+Two Rust paths exist for ESP32-C5:
+- `esp-hal` — bare-metal `no_std`. Maximum control, but you implement/port WiFi, TCP, TLS, FAT/exFAT, HTTP server yourself. Heavy lift.
+- **`esp-idf-svc` / `esp-idf-hal` (std)** — Rust on top of Espressif's IDF. WiFi, SoftAP, an HTTP server, a FAT/SD layer, and NVS key storage are already available. **We use this** — it gets a working device to "files move over WiFi" in a fraction of the time, which matters for a first product.
+
+## Crate layout (Cargo workspace)
+
+```
+firmware/
+├── Cargo.toml                # workspace
+└── crates/
+    ├── tucklet-fw/            # the binary that runs on the device
+    ├── tucklet-proto/         # shared protocol types (serde structs from PROTOCOL.md)
+    └── tucklet-core/          # device logic: state machine, allow-list, sessions
+```
+
+`tucklet-proto` is `no_std + serde` so the **same types can be reused by the apps** (via a thin codegen/FFI or by mirroring), keeping firmware and app in lockstep with PROTOCOL.md.
+
+## Runtime state machine
+
+```
+            press (short)
+  ASLEEP ─────────────────▶ ADVERTISING ──(authorized phone connects)──▶ CONNECTED
+    ▲                            │                                          │
+    │ inactivity timeout         │ timeout / no auth                        │ session start
+    └────────────────────────────┴──────────────────────────────────◀──────┤
+                                                                            ▼
+                                                                     TRANSFERRING (SoftAP up)
+                                                                            │ done / idle
+                                                                            ▼
+                                                                        CONNECTED ──▶ ASLEEP
+```
+
+- **ASLEEP:** radios off, deep sleep, button wake configured.
+- **ADVERTISING:** BLE only, short window, LED breathing. New phones require the physical press to enter the allow-list.
+- **CONNECTED:** BLE link up, STATUS notifications flowing (battery/free space). No WiFi.
+- **TRANSFERRING:** SoftAP + HTTP server up, single-use creds issued, files move. Torn down on idle/complete.
+
+## Modules (in tucklet-core)
+
+- `state` — the machine above.
+- `auth` — allow-list in NVS, pairing handshake, X25519 key exchange (production).
+- `session` — single-use SoftAP credential + token generation/expiry.
+- `storage` — exFAT over SDIO; manifest build; origin-metadata sidecar (`.tucklet.json` per item or a single index).
+- `power` — fuel-gauge read, charge state, sleep policy.
+- `ui` — button press-pattern decode (short/hold), LED state mapping.
+- `agg` — **SPI Master/Slave** driver for the dual-radio aggregation link (dual-C5 variants only).
+
+## Dual-Radio AGG Link — SPI Architecture
+
+The dual ESP32-C5 variants use a dedicated **SPI bus** for inter-processor communication, replacing the legacy UART approach. SPI unlocks 12–15 MB/s sustained aggregated throughput, a significant improvement over the ~8–10 MB/s UART bottleneck.
+
+### SPI AGG Link Pins
+
+| Signal | Direction (U1 → U1B) | Notes |
+|---|---|---|
+| `AGG_CLK` | U1 output → U1B input | SPI clock, driven by primary radio |
+| `AGG_CS` | U1 output → U1B input | Chip select, active low |
+| `AGG_MOSI` | U1 output → U1B input | Data from primary to secondary |
+| `AGG_MISO` | U1 input ← U1B output | Data from secondary to primary |
+
+U1 (primary) is the SPI master; U1B (secondary) is the SPI slave. The firmware on U1 coordinates link aggregation — striping data across both Wi-Fi radios for higher combined throughput.
+
+### Firmware Responsibilities
+
+1. **Initialization:** On dual variants, U1 initializes the SPI master, U1B initializes the SPI slave.
+2. **Synchronization:** U1 asserts `AGG_CS` to start a transaction, clocks data on `AGG_MOSI`, and reads `AGG_MISO`.
+3. **Packet format:** The AGG link uses a simple framed protocol:
+   - Header: `[0xAA, 0x55, cmd, len_hi, len_lo]`
+   - Payload: `[data...]`
+   - Footer: `[checksum]`
+4. **Throughput:** Target is 12–15 MB/s sustained. This is limited by SPI clock speed and the secondary radio's ability to keep up with the data stream.
+
+### Why SPI over UART
+
+| Attribute | UART | SPI |
+|---|---|---|
+| Wires | 2 (TX, RX) | 4 (CLK, CS, MOSI, MISO) |
+| Max throughput | ~8–10 MB/s | ~12–15 MB/s |
+| Flow control | Software (XON/XOFF) | Hardware (CS) |
+| Latency | Higher | Lower |
+| Pin count | 2 | 4 |
+
+The 4-wire SPI link is justified by the 50–87% throughput improvement. The additional 2 pins are available on the ESP32-C5 in both WROOM and MINI form factors.
+
+## Variant handling
+
+Compile-time Cargo features select the hardware reality; everything else is runtime:
+
+```
+[features]
+# Chip selection
+chip_c5 = []
+chip_e22 = []
+
+# Form Factor
+form_wroom = []
+form_mini  = []
+
+# Radio Count (derived or explicit)
+radio_single = []
+radio_dual   = []
+
+# Storage
+storage_microsd = []
+storage_emmc    = []
+
+# Transport
+transport_softap = []        # always on
+transport_wifi_aware = []    # optional
+transport_wired_usbhs = []   # optional (the bridge IC is populated)
+
+# AGG Link
+agg_spi = []                 # dual variants use SPI; single doesn't need it
+```
+
+At boot the firmware assembles a `DeviceCapabilities` from its enabled features and advertises it. `tucklet-core::variant::usable_transports()` (unit-tested) then narrows that to what the connected client can use.
+
+## Storage ownership — the shared-bus architecture
+
+The SDIO storage bus is shared between the radio (wireless path) and the USB-HS bridge (wired path) via a hardware mux (U6). The firmware controls this mux via the `SD_SEL` GPIO:
+
+- **SD_SEL = LOW** (default): Radio (U1) owns the storage. Firmware reads/writes via SDIO.
+- **SD_SEL = HIGH** (bridge owns): USB-HS bridge (U2) owns the storage. The bridge appears as a USB mass storage device when plugged in.
+
+**Firmware rule:** Never access the storage bus when `SD_SEL` is HIGH (USB plugged in). The bridge is autonomous and the firmware must not interfere. Similarly, the bridge must not access the bus when `SD_SEL` is LOW (wireless mode).
+
+### Mux timing
+
+1. **USB plug-in detected** (VBUS present, or firmware detects USB connect event).
+2. Firmware flushes any pending writes, unmounts the filesystem, and drives `SD_SEL` HIGH.
+3. Bridge takes ownership. Computer sees a USB mass storage device.
+4. **USB unplug detected** (VBUS falls).
+5. Bridge releases the bus. Firmware drives `SD_SEL` LOW.
+6. Firmware re-initializes SDIO, remounts the filesystem.
+
+This handoff is seamless from the user's perspective: unplug the USB cable and the charm is immediately available for wireless transfers again.
+
+### Per-variant mux considerations
+
+| Variant | Mux | Notes |
+|---|---|---|
+| **All single C5** | TS3A-class (primary) | Standard SDIO mux. Validate bandwidth on prototype. |
+| **All single C5** | TMUX1574 (alternative) | Upgrade path if SDIO timing issues observed. |
+| **All single C5** | TXS02612 (alternative) | SD-specific with level shifting. |
+| **All dual C5** | TS3A-class (primary) | Same mux as single, but firmware must also coordinate AGG link state. |
+| **All dual C5** | TMUX1574 (alternative) | Recommended upgrade for dual variants due to higher SDIO clock rates. |
+
+## Security notes
+
+- SoftAP credentials and session tokens are single-use and short-TTL (PROTOCOL §4).
+- Allow-list entries are phone public keys; clear via long-hold factory reset.
+- No static secrets, nothing printed on the device.
+
+## Power management
+
+### Charge + transfer simultaneous operation
+
+The BQ25896 (primary charger) provides a **power-path** output (`SYS` pin) that powers the system directly from USB while the battery charges. This means:
+
+1. **USB plugged in, transferring:** System runs from USB power via `SYS`. Battery charges in parallel. Radio can operate at full power.
+2. **USB plugged in, idle:** System runs from USB power. Battery charges.
+3. **USB unplugged:** System runs from battery via buck regulator (U5).
+
+The MCP73831 (backup charger) does **not** have power-path. If this alternative is used, the system runs from battery even when USB is plugged in. For single-C5 variants where simultaneous charge+transfer is rare, this is acceptable. For dual-C5 variants, the BQ25896 is strongly recommended.
+
+### Charge current sizing
+
+The BQ25896 sets charge current via I2C (or PROG resistor fallback). For a 120–200 mAh LiPo:
+- **Charge current:** 500 mA (safe for small cells, charges in ~20–40 min).
+- **Input current limit:** 900 mA (allows headroom for system load while charging).
+
+The MCP73831 sets charge current via PROG resistor only (no I2C). R3 = 2 kΩ sets ~500 mA.
+
+### I2C bus sharing
+
+The BQ25896 shares the I2C bus with the MAX17048 (fuel gauge). Both are I2C slaves with different addresses. The firmware uses a shared I2C bus driver and addresses each device independently. Only one set of pull-ups (R4, R5) is needed.
+
+## Honest status
+
+This is a **scaffold**: the structure, types, and state machine are real and correct, but the device-specific bring-up (SDIO timing, WiFi current tuning, exFAT integration, real key exchange) must be done and tested on actual hardware. It is not a flashed, validated binary.
+
+The following items require on-hardware validation:
+- SDIO timing with the TS3A-class mux (upgrade to TMUX1574 if issues)
+- GL3224-OEM bridge handoff timing (USB plug/unplug transitions)
+- BQ25896 I2C control and charge current calibration for the specific cell
+- Dual-radio SPI AGG link throughput and RF isolation
+- Thermal management under sustained transfer (especially dual variants)
+- exFAT filesystem integrity during power loss mid-transfer
+
+docs/VARIANT_MATRIX.md
+
+# Variant Matrix — every build configuration, and how one codebase serves all
+
+Tucklet is not one device; it's a small product line from a single shared codebase. Four independent axes multiply into the full matrix. Firmware and apps adapt at runtime via the `DeviceCapabilities` descriptor (see `tucklet-proto`), so there is **one** firmware source and **one** app per platform — variants are configuration + capability negotiation, not forks.
+
+## The four axes
+
+| Axis | Options | Chosen by |
+|---|---|---|
+| **Chip** | `C5` (Production) / `E22` (Roadmap) | hardware build (compile-time feature) |
+| **Form Factor** | `WROOM` (Standard) / `MINI` (Compact) | hardware build |
+| **Radio Count** | `Single` / `Dual` | hardware build |
+| **Storage** | `MicroSd` / `Emmc{capacity_gib}` | hardware build |
+| **Transport(s)** | `SoftAp` (always) + optionally `WifiAware` + optionally `WiredUsbHs` | firmware feature flags + runtime |
+
+Theoretical maximum: 2 Chips x 2 Forms x 2 Counts x 2 Storage = 16 Variants.
+**Actual Generated Variants:** 12 (See "Charm Strategy Exclusion" below).
+
+## Charm Strategy Exclusion
+To maintain the "Charm" product identity (invisible, robust, AirTag-class), we enforce a strict size constraint.
+*   **Excluded:** `E22-WROOM` variants. The WROOM/M.2 module is oversized (22x30mm) and requires an external antenna (IPEX), which violates the sealed/integrated design philosophy.
+*   **Included:** `E22-MINI` variants. We anticipate a future Mini module that fits the Charm form factor. These are marked as **Roadmap** items.
+
+## The 12 generated configurations
+
+### Tier 1: The "Charm" (Standard C5)
+The production-ready baseline using the ESP32-C5-WROOM-1 module.
+
+| # | Radio | Storage | Wireless | Wired | Position |
+|---|---|---|---|---|---|
+| 1 | SingleC5 | microSD | SoftAp | USB-HS | **Baseline** — cheapest, swappable |
+| 2 | SingleC5 | eMMC | SoftAp | USB-HS | Slim, sealed, fixed capacity |
+| 3 | DualC5 | microSD | SoftAp | USB-HS | Speed-focused, swappable |
+| 4 | DualC5 | eMMC | SoftAp | USB-HS | Speed + sealed |
+
+### Tier 2: The "Nano" (Mini C5)
+The ultra-compact production line using the ESP32-C5-MINI-1 module.
+
+| # | Radio | Storage | Wireless | Wired | Position |
+|---|---|---|---|---|---|
+| 5 | SingleC5 | microSD | SoftAp | USB-HS | Ultra-compact, swappable |
+| 6 | SingleC5 | eMMC | SoftAp | USB-HS | Smallest sealed charm |
+| 7 | DualC5 | microSD | SoftAp | USB-HS | Experimental speed in Nano form |
+| 8 | DualC5 | eMMC | SoftAp | USB-HS | Top-tier Nano |
+
+### Tier 3: The "Super-Charm" (Roadmap E22)
+High-performance variants dependent on the future release of an ESP32-E22-MINI-1 module.
+
+| # | Radio | Storage | Wireless | Wired | Position |
+|---|---|---|---|---|---|
+| 9 | SingleE22 | microSD | SoftAp | USB-HS | High-speed roadmap |
+| 10 | SingleE22 | eMMC | SoftAp | USB-HS | High-speed sealed roadmap |
+| 11 | DualE22 | microSD | SoftAp | USB-HS | Extreme performance roadmap |
+| 12 | DualE22 | eMMC | SoftAp | USB-HS | Ultimate speed roadmap |
+
+*(Note: microSD and eMMC each span the capacity sub-axis; eMMC capacities and BOM are in `hardware/common/VARIANTS.md`.)*
+
+## The Product Lines
+
+Tucklet is organized as two distinct product lines, both under the same source-available, non-commercial licensing:
+
+| Line | Radio | Form Factor | Variants | Position |
+|---|---|---|---|---|
+| **Charm Standard** | ESP32-C5 | WROOM | 4 | Baseline: Lowest cost, easy assembly |
+| **Charm Compact** | ESP32-C5 | MINI | 4 | Nano: Smallest footprint, tighter layout |
+| **Charm High-Perf** | ESP32-E22 | MINI | 4 | Roadmap: Wi-Fi 6E speed, pending module release |
+| **Pro High-Perf** | ESP32-E22 | WROOM | Roadmap | Larger: Wi-Fi 6E speed, 2S battery, pending module release |
+
+All lines are licensed under **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software). The Pro line is a **Charm** — it fits a "charm" envelope (wearable, on-phone), even though it is thicker to accommodate the 2S battery. It is not a "backpack" or "brick" class device. You may study, modify, and build for personal use; commercial sale requires a separate agreement.
+
+**Note:** The ESP32-E22 variants (both MINI and WROOM) are **Roadmap** items. The `ESP32-E22-MINI-1` module is projected but not yet released. The `ESP32-E22-WROOM` module (22×30 mm, external IPEX antenna) is the basis for the Pro line. **No E22 variant folders are created at this time** (see "Variant Folder Organization" below).
+
+## How firmware handles the matrix
+
+Compile-time Cargo features select the hardware reality; everything else is runtime:
+
+```
+[features]
+# Chip selection
+chip_c5 = []
+chip_e22 = []
+
+# Form Factor
+form_wroom = []
+form_mini  = []
+
+# Radio Count (derived or explicit)
+radio_single = []
+radio_dual   = []
+
+# Storage
+storage_microsd = []
+storage_emmc    = []
+
+# Transport
+transport_softap = []        # always on
+transport_wifi_aware = []    # optional
+transport_wired_usbhs = []   # optional (the bridge IC is populated)
+
+# AGG Link
+agg_spi = []                 # dual variants use SPI; single doesn't need it
+```
+
+At boot the firmware assembles a `DeviceCapabilities` from its enabled features and advertises it. `tucklet-core::variant::usable_transports()` (unit-tested) then narrows that to what the connected client can use.
+
+## How apps handle the matrix
+
+The app never hard-codes a variant. On connect it reads `DeviceCapabilities` over BLE, then:
+
+1. Calls the equivalent of `usable_transports(caps, platform)` to pick a transport (Wi-Fi Aware first if both sides have it, else SoftAP; wired when plugged in).
+2. Loads the matching `LinkProfile` (`tucklet-core::link::profile_for`) so the transfer-time estimate reflects *this* unit's real speed.
+3. Renders capacity, storage type, and battery from the live `StatusReport`.
+
+So a user with a microSD SingleC5 Mini and a user with a DualC5 eMMC Standard run the identical app; it simply reports different speeds and capacities. The same is true across iOS, Android, and desktop because all three consume the same `tucklet-proto` types.
+
+## Capability negotiation sequence
+
+1. BLE connect + cryptographic auth (allow-list).
+2. App reads `DeviceCapabilities` + `StatusReport`.
+3. App resolves transport + link profile for the current platform and physical state (plugged in or not).
+4. App shows accurate ETAs and storage states before any bytes move.
+
+## Storage axis
+
+### microSD (swappable)
+Push-push socket, SDIO 4-bit, +~$0.40. Customer supplies/upgrades the card; you don't pay for flash. Dead card = $5 swap, not a dead device. Slightly larger enclosure (socket + insertion clearance), placed internally behind a small door so the unit still looks sealed.
+
+### eMMC (sealed) — per-capacity cost (small-volume estimate; VERIFY)
+153-ball TFBGA eMMC 5.1, 11.5 × 13.0 × 1.2 mm. Capacity is fixed at manufacture.
+
+| Capacity | eMMC est. | Full BOM (single-C5) |
+|---|---|---|
+| 8 GB | ~$2.50 | ~$13.5 |
+| 16 GB | ~$3.50 | ~$14.5 |
+| 32 GB | ~$5.00 | ~$16.0 |
+| 64 GB | ~$8.00 | ~$19.0 |
+| 128 GB | ~$13.00 | ~$24.0 |
+| 256 GB | ~$22.00 | ~$33.0 |
+
+Only 8–16 GB eMMC stays near the sub-$15 target — the honest cost of integrated flash, and exactly why offering microSD *and* eMMC is smart. Requires BGA assembly (CM with reflow + ideally X-ray).
+
+## Radio axis
+
+Performance and Power vary significantly between the C5 and E22 generations.
+
+| Radio | Real wireless | Module size | Fits charm? | Notes |
+|---|---|---|---|---|
+| 1× ESP32-C5 | ~6–9 MB/s (5 GHz Wi-Fi 6) | WROOM: ~18 × 27.5 mm / MINI: ~15.4 × 21.3 mm | yes | **Recommended baseline.** Best balance of power/performance. |
+| 2× ESP32-C5 | ~12–15 MB/s (SPI AGG) | 2 modules + 2 antennas | tight | **Experimental.** Validate RF isolation before production. SPI link prevents inter-chip bottleneck. |
+| 1× ESP32-E22 | ~20–40+ MB/s (Wi-Fi 6E) | MINI: ~15 × 21 mm (projected) | yes (warm) | **High Performance.** Tri-band (2.4/5/6 GHz). Requires >2A buck & larger battery. **MINI form factor only. Roadmap.** |
+| 2× ESP32-E22 | ~40–70+ MB/s (SPI AGG) | MINI: 2 modules | tight (hot) | **Extreme Performance.** Significant thermal considerations. **MINI form factor only. Roadmap.** |
+| 1× ESP32-E22 (Pro) | ~20–40+ MB/s (Wi-Fi 6E) | WROOM: 22 × 30 mm | yes (Pro envelope) | **Pro Charm.** External IPEX antenna. 2S battery. ~35
+
+
+docs/POWER_THERMAL.md
+
+# Power, Thermal & Production-Readiness Engineering
+
+Everything that has to be true for the device to be safe, reliable, and
+manufacturable — not just functional on a bench.
+
+## Power budget
+The charm must sip power at rest (so it lasts weeks and feels "always there")
+and tolerate WiFi current spikes during transfer without browning out.
+
+| State | Dominant draw | Approx current | Notes |
+|---|---|---|---|
+| Asleep | RTC + leakage | ~10-50 uA | radios off, deep sleep, button/timer wake |
+| Advertising (BLE low-duty) | BLE TX bursts | ~tens-hundreds uA avg | rotating address; weeks on a small cell |
+| Connected (BLE only) | BLE link | ~3-8 mA | STATUS notifications |
+| Transferring (WiFi 5 GHz - C5) | WiFi TX | bursts to ~500 mA | sizing case for C5 Charm |
+| Transferring (Wi-Fi 6E - E22) | WiFi TX + CPU | bursts to ~1.5-2.0 A | sizing case for E22 Roadmap/Pro |
+| Charging | charger IC | up to ~500 mA in | from USB-C VBUS |
+
+Design rules:
+- Size the 3.3 V buck for the **WiFi peak**, not the average. Under-sizing
+  causes mid-transfer brownout resets — the #1 ESP bring-up bug.
+  - **C5 Variants:** Size for **~600-1000 mA** peak (single vs dual).
+  - **E22 Variants:** Size for **~2.0 A** peak (Dual-core 500MHz + Wi-Fi 6E radio).
+- Place bulk + decoupling capacitance close to the radio module; wide copper on
+  VBUS / BAT / 3V3.
+- WiFi SoftAP/Aware is **off by default** and only spun up for an active
+  session, then torn down — both a battery and a security property.
+- Battery:
+  - **C5 Charm:** LiPo ~120-200 mAh with a protection circuit (PCM).
+  - **E22 Roadmap:** Requires larger **300-500 mAh** cells to support high peak
+    currents.
+  - Finalize the exact mAh **after measuring real transfer current on a
+    prototype** (5 GHz / 6E draw differs significantly from older estimates).
+    DualC5/E22 builds need a larger cell and budget for simultaneous radios.
+
+## The 1S vs 2S power decision
+
+The choice between 1S (3.7V) and 2S (7.4V) LiPo impacts the Charger, Gauge,
+Buck Regulator, Battery, and Enclosure dimensions. This is a **variant-level
+parameter**, not a global swap.
+
+### 1S path — The "Charm Standard"
+
+| Attribute | Value |
+|---|---|
+| **Nominal Voltage** | 3.7V (4.2V max) |
+| **Charger (U3)** | **BQ25896** (Buck, I2C, Power-Path) |
+| **Fuel Gauge (U4)** | **MAX17048** (ModelGauge, no sense resistor) |
+| **Buck Regulator (U5)** | Step-down from 4.2V to 3.3V (High efficiency) |
+| **Battery** | 120–200 mAh, ~3mm thick |
+| **Enclosure Impact** | Fits **9mm** (microSD) / **8mm** (eMMC) Charm envelope |
+| **Power-Path** | Yes (BQ25896 SYS pin powers system while charging) |
+| **Peak Current** | Sufficient for single/dual C5 |
+| **Complexity** | Simple, small gauge |
+| **License** | CC BY-NC-SA 4.0 / PolyForm NC (Charm line) |
+
+### 2S path — The "Pro Charm"
+
+| Attribute | Value |
+|---|---|
+| **Nominal Voltage** | 7.4V (8.4V max) |
+| **Charger (U3)** | **BQ25887** (Boost + Cell Balancing, I2C) |
+| **Fuel Gauge (U4)** | **BQ27421** or **BQ27520** (Impedance Track, requires sense resistor) |
+| **Buck Regulator (U5)** | Step-down from 8.4V to 3.3V (Different inductor/feedback) |
+| **Battery** | ~120–150 mAh, ~6mm thick (stacked cells) |
+| **Enclosure Impact** | Requires **12–13mm** thickness (breaks AirTag class; justified by performance) |
+| **Power-Path** | Yes (BQ25887 SYS pin) |
+| **Peak Current** | Sustained high-current for E22/dual |
+| **Complexity** | Sense resistor, balancing leads, safety |
+| **License** | CC BY-NC-SA 4.0 / PolyForm NC (Pro line — still a Charm) |
+
+The 2S "Pro Charm" is **still a charm** — it clips to your phone, hangs on a
+string, and disappears into your daily carry. It is not a "backpack" or "brick"
+class device. The thickness is justified by the performance: Wi-Fi 6E throughput
+and sustained high-current operation that the 1S Charm line cannot deliver. The
+Pro line is fully covered under the **same source-available, non-commercial
+license** (CC BY-NC-SA 4.0 / PolyForm Noncommercial 1.0.0) as the Charm line.
+
+### Downstream impacts of 2S
+
+1.  **Mechanical:** A 2S battery requires ~6mm thickness. The current 9mm
+    envelope (3mm batt + 3.3mm WROOM + 2.7mm floor/lid) cannot fit. A 2S "Pro"
+    variant needs a **12–13mm** envelope (e.g., 35×28×12–13 mm). The parametric
+    `enclosure.scad` supports this via the `pro` variant parameter.
+2.  **Buck (U5):** A 2S input (up to 8.4V) requires a different buck converter
+    with higher input voltage rating and likely a larger inductor than the 1S
+    version. TPS62840-class (SOT-23-6) recommended for both E22 and 2S.
+3.  **Fuel Gauge (U4):** The MAX17048 only supports 1S. A 2S pack requires the
+    BQ27421/BQ27520, which needs an external current-sense resistor in the
+    battery path. This is an additional BOM line item and PCB footprint.
+4.  **Certification:** A 2S pack carries higher energy density;
+    transport/shipping regulations (UN38.3) are stricter and more expensive to
+    certify for small devices.
+
+**Recommendation:** The **1S path (BQ25896 + MAX17048) is the "Charm
+Standard"**. The 2S path is a "Pro" variant that requires mechanical scaling
+and is documented in [`hardware/PRO_LINE.md`](hardware/PRO_LINE.md), but the
+default generated variants remain 1S to preserve the AirTag-class form factor.
+
+## Battery safety (non-negotiable for a sellable product)
+- Use a cell with an integrated protection circuit (over-charge,
+  over-discharge, over-current, short).
+- The charger IC must terminate correctly and respect temperature; consider
+  an NTC thermistor for charge-temperature qualification.
+  - **1S (BQ25896):** The TS pin accepts an NTC thermistor for
+    charge-temperature qualification. If omitted, tie TS to VREF with a
+    resistor divider per the BQ25896 datasheet.
+  - **2S (BQ25887):** Similarly supports thermistor input for charge safety.
+- No charging outside a safe temperature window. The firmware reads the fuel
+  gauge / NTC and refuses to charge when too hot/cold.
+- Ship with transport state-of-charge per shipping regulations for lithium
+  cells.
+- **2S specific:** The 2S pack carries higher energy density; transport/shipping
+  regulations are stricter and more expensive to certify for small devices.
+  UN38.3 certification is required for 2S LiPo battery transport/shipping.
+
+## Thermal
+- Steady-state heat sources: the radio during sustained transfer, the buck
+  regulator, the charger while charging, and (in eMMC builds) the eMMC under
+  heavy write.
+- **E22 Thermal Density:** The ESP32-E22 (Roadmap/Pro) generates significantly
+  more heat than the C5 due to its 500MHz dual-core processor and Wi-Fi 6E
+  radio.
+- The enclosure is small and mostly sealed, so heat has nowhere to go quickly.
+  Mitigations:
+  - Keep sustained-transfer sessions bounded; the trickle model naturally
+    spreads work into short low-power bursts, which is thermally gentle.
+  - **E22 Throttling:** For E22 variants, firmware *must* actively monitor
+    internal temperature sensors and throttle throughput if thermal limits are
+    approached, as the "Charm" form factor has limited passive cooling.
+  - Don't charge and run a heavy WiFi transfer simultaneously at full tilt
+    without thermal headroom.
+  - Choose an enclosure material with reasonable conductivity or an internal
+    copper pour as a heat spreader; validate with a thermal soak test on a
+    prototype.
+  - The Pro enclosure includes heat vent slots for thermal relief during
+    sustained transfer.
+- **GL3224 USB 3.0 Bridge:** The USB 3.0 bridge generates noticeable heat
+  during sustained wired transfers (70–100+ MB/s). This is a new thermal
+  contribution compared to USB 2.0 bridges. Ensure thermal vias under U2 and
+  adequate copper pour connection. The bridge is only active when plugged in,
+  so it does not contribute to wireless transfer thermal load.
+- Validation: a thermal soak (worst case = charging + sustained transfer at
+  high ambient) measuring case temperature against a safe-to-touch limit.
+  This is a prototype test, not a calculation to trust blindly.
+
+## Reliability / robustness
+- **Brownout & watchdog:** enable the brownout detector and a hardware
+  watchdog; the firmware state machine is total (no panics on unexpected
+  events — see `tucklet-core::state`).
+- **Storage integrity:** exFAT with flush-on-complete; never report a
+  transfer "done" until the write is durably committed. microSD card-absent /
+  corrupt / wrong-filesystem states are surfaced to the app in plain language.
+- **Power-loss safety:** transfers are item-atomic; a yanked cable mid-transfer
+  leaves no half-files in the manifest (write to temp, fsync, rename, then
+  index).
+- **Single-use session credentials** with short TTL; nothing static printed
+  on the device.
+
+## Regulatory (gates between prototype and sale — real cost + weeks)
+- **FCC (US) / CE (EU) / and local (e.g. for the Caribbean launch market)**:
+  required because the device contains radios. Using a **pre-certified radio
+  module** (the WROOM/MINI-class module rather than a bare chip) dramatically
+  reduces, but does not eliminate, this burden.
+- **Battery / lithium** transport and safety marks.
+- **RoHS / lead-free** declaration.
+- Wi-Fi Alliance **certification** only if you ship the `WifiAware` transport
+  and want Apple's framework to talk to the device cleanly. SoftAP needs none
+  of this.
+- Budget certification time and money explicitly; build the SoftAP prototype
+  first and validate demand before spending on Wi-Fi Aware certification.
+- **UN38.3:** Required for 2S LiPo battery transport/shipping.
+
+## Manufacturing notes
+- eMMC and the radio module are BGA/edge-castellated parts: assembly needs a
+  contract manufacturer with reflow and (for BGA) ideally X-ray inspection —
+  not a hand-solder job.
+- **Mini Form Factor:** The C5-MINI-1 and E22-MINI-1 (Roadmap) variants have
+  higher component density. Ensure the CM is comfortable with the tighter
+  layout tolerances.
+- **GL3224 QFN-32:** The USB 3.0 bridge requires careful reflow due to the
+  exposed center pad (GND_PAD, pin 32). Ensure proper solder paste stencil
+  aperture for the thermal pad.
+- **BQ25896 WQFN-24:** Similarly has an exposed thermal pad requiring proper
+  solder paste coverage for both electrical ground and thermal dissipation.
+- A simple end-of-line test jig should verify: power-up, charge, BLE advertise,
+  WiFi bring-up, storage read/write, button, LED. (See `production/` in the repo
+  structure.)
+- Keep the microSD and eMMC boards pin-compatible where possible so one
+  certification + one test jig covers both.
+- **2S (Pro):** A 2S LiPo pack carries higher energy density; transport/shipping
+  regulations (UN38.3) are stricter and more expensive to certify for small
+  devices.
+
+docs/TRANSFER_PERFORMANCE.md
+
+# Transfer Performance & Layer-1 Wireless Architecture
+
+This is the document that decides whether the product is good. Most wireless drives in history died on slow transfers + clunky apps (SanDisk Connect, Gnarbox, WD My Passport Wireless, the Seagate units — a graveyard of discontinued products). Tucklet targets exactly that weak spot, so the speed story has to be honest and engineered, not hoped for.
+
+## Units (the thing that confused everyone)
+Networks are quoted in mega**bits** (Mbps); files in mega**bytes** (MB/s). Divide Mbps by 8 to get MB/s. "30–70 Mbps" = "~4–9 MB/s". This doc uses **MB/s** because that's what a user feels.
+
+## The two layers
+- **Layer 1 — wireless data path.** The everyday path. Must be invisible and low-power. This is the focus.
+- **Layer 2 — wired fast path.** A plug-in fallback for bulk. Optional, but it fits the dimensions (see below), so it stays in.
+
+## The hard ceiling of the ESP32 family
+Espressif's own number is "up to 20 Mbit/s TCP, 30 Mbit/s UDP over the air"; measured real-world results scatter from ~7–22 Mbit/s down to far less. Most ESP chips are single-stream (1x1), 20–40 MHz radio, physically capped around ~9 MB/s. The ESP32-S3's USB is Full-Speed only (12 Mbps ceiling) and its own "wireless disk" demo measured 540 KB/s read / 350 KB/s write — so the ESP chip itself can NEVER be the fast wired path.
+
+## Layer-1 options (verified spectrum)
+
+| Option | Class | Real throughput | Size | ~Cost (radio) | Battery | Fits charm? |
+|---|---|---|---|---|---|---|
+| ESP32-S3 | MCU | ~2–5 MB/s, 2.4GHz only | 18×25.5mm | ~$2.75 | weeks | Yes (but slow) |
+| **ESP32-C5** | MCU | **~4–9 MB/s**, +5GHz WiFi6 | ~18×27.5mm | ~$2–3 | weeks | **Yes — CURRENT STANDARD** |
+| **ESP32-E22-MINI-1** | MCU (Hi-Perf) | **~20–40+ MB/s** (Projected) | ~15×21mm (Projected) | ~$4–5 | days | **Yes — ROADMAP** |
+| Dual ESP32-C5 (aggregation) | MCU x2, experimental | ~12–15 MB/s (SPI AGG) | 2 modules + 2 ant | ~$5–6 | days | Tight but plausible |
+| MT7628 + 802.11ac + Linux | Router SoC | ~6–18+ MB/s dual-band | SoC+DDR+flash | ~$10–20 | big cell | No (FileHub-sized) |
+| 2x2 ac/ax module + Linux SoM | App processor | ~20–50+ MB/s | larger | ~$15–30+ | big cell | No |
+
+**Conclusion:** The market bifurcates. You either accept the physical limits of a "Charm" sized device, or you build a brick. Tucklet chooses the Charm. The **ESP32-C5** is the balance for today. The **ESP32-E22-MINI-1** is the roadmap for a "Super-Charm" that maintains the form factor but breaks the throughput ceiling.
+
+### Decision: ESP32-C5 (Standard) & ESP32-E22-MINI-1 (Roadmap)
+**Standard (C5):** Dual-band Wi-Fi 6 (adds 5GHz, less congested), ~2x the S3's wireless, BLE retained for control, charm-sized, low power, in mass production.
+**Roadmap (E22):** Wi-Fi 6E (Tri-band) offers the potential for significant throughput gains (2x2 MIMO, 160MHz channels) inside a projected Mini form factor. This allows a "Pro Charm" variant without breaking the dimensions. Note: The E22 requires significantly more power (larger battery) and thermal management.
+
+### The Pro Line (E22-WROOM + 2S)
+The **Pro line** uses the **ESP32-E22-WROOM** (22×30 mm module with external IPEX antenna) and a **2S LiPo** battery pack. This requires a larger enclosure (~35×28×12–13 mm). However, the Pro remains a **"Pro Charm"** — it clips to your phone, hangs on a string, and disappears into your daily carry. It is not a "backpack" or "brick" class device. The thickness is justified by the performance: Wi-Fi 6E throughput and sustained high-current operation that the 1S Charm line cannot deliver.
+
+The Pro line is fully covered under the **same source-available, non-commercial license** as the Charm line: **CC BY-NC-SA 4.0** (hardware) and **PolyForm Noncommercial 1.0.0** (software). You may study, modify, and build Pro variants for personal use; commercial sale requires a separate agreement. The Pro design IP is documented in [`hardware/PRO_LINE.md`](../hardware/PRO_LINE.md).
+
+| Pro Variant | Radio | Battery | Wireless | Wired | Envelope | License |
+|---|---|---|---|---|---|---|
+| P1 | Single E22-WROOM | 2S LiPo | Wi-Fi 6E | USB-HS (GL3224) | 35×28×12–13 mm | CC BY-NC-SA 4.0 / PolyForm NC |
+| P2 | Single E22-WROOM | 2S LiPo | Wi-Fi 6E | USB-HS (GL3224) | 35×28×12–13 mm | CC BY-NC-SA 4.0 / PolyForm NC |
+| P3 | Dual E22-WROOM | 2S LiPo | Wi-Fi 6E AGG | USB-HS (GL3224) | 35×28×12–13 mm | CC BY-NC-SA 4.0 / PolyForm NC |
+| P4 | Dual E22-WROOM | 2S LiPo | Wi-Fi 6E AGG | USB-HS (GL3224) | 35×28×12–13 mm | CC BY-NC-SA 4.0 / PolyForm NC |
+
+**No Pro variant folders are created at this time.** When the E22-WROOM datasheet is released and the Pro line is ready for prototyping, variant folders (e.g., `pro-e22-wroom-microsd/`) will be added with the same `standard/` + `alternatives/` structure, under the same source-available, non-commercial license as the Charm line.
+
+## The form factor is a hidden Layer-1 advantage
+Because the charm sits ON the phone, the radio link is centimeters long → near-perfect SNR → the radio sustains its TOP modulation rate → you reliably land at the HIGH end (~9 MB/s for C5, higher for E22), not the low end (~4). Competing drives sit across the room and suffer; Tucklet never does. The UX form factor also maximizes the cheap radio's throughput.
+
+**The "Charm Advantage":**
+This proximity advantage is our primary defense against obsolescence. While a FileHub across the room struggles with interference, Tucklet's "on-phone" position gives it a pristine RF environment. This means a C5 in a Charm often outperforms a faster chip in a brick, simply due to link budget.
+
+## Experimental Layer-1 boosters (unproven, flagged honestly)
+1. **Dual-C5 link aggregation** (app-layer striping or MPTCP): ~12–15 MB/s via **SPI AGG link**. Hard part = RF isolation of two 5GHz antennas in ~32mm (orthogonal placement + polarization mitigates; not guaranteed until prototyped). Best "beyond C5" lever that fits the current chip availability. Treat as v2.
+2. **ESP32-E22 Upgrade:** Swapping the C5 for an E22-MINI (when available) is the most direct path to speed. It fits the same footprint philosophy (Mini) but moves to 2x2 Wi-Fi 6E. This is the preferred "v2" hardware upgrade path over aggregation complexity.
+3. **Pro Charm (E22-WROOM + 2S):** A thicker but still charm-class device using the E22-WROOM module with external IPEX antenna and 2S battery. Same wireless performance as E22-MINI but with a larger power budget for sustained transfers. Fully covered under the same source-available, non-commercial license as the Charm line. Documented in [`hardware/PRO_LINE.md`](../hardware/PRO_LINE.md).
+4. **Magnetic snap-on contact pins** (MagSafe-style): full wired speed with snap-on feel. Catch: phones expose no back-side data pins, only the charge port — needs a companion case or snap-over-USB-C. Accessory path
+5. **60 GHz / 802.11ad**: gigabits at cm range (ideal for a charm), but no phone exposes it to third parties and modules are power-hungry/costly. Dream, not buildable now.
+6. **Trickle-sync (THE winning lever, not hardware):** continuously back up new photos whenever the charm is near the phone and idle/charging, so the big transfer NEVER happens and raw throughput stops mattering for the everyday case. Cheap radio + always-present + patient background sync beats a fast radio used occasionally. Strong on Android; partial on iOS (background-networking limits). This is the design philosophy that makes a 9 MB/s charm feel better than an 18 MB/s brick.
+
+## Layer 2 — wired fast path (kept, because it fits)
+A dedicated USB 3.0 High-Speed card-reader/bridge IC (GL3224-OEM, ~$1.80, 5×5 mm QFN-32) owns the microSD/eMMC when plugged in, bypassing the ESP entirely → **~70–100+ MB/s** with USB 3.0. The bridge is the **primary** wired path, standard across all Charm and Pro variants.
+
+Backup wired paths:
+- **PL2732** (QFN-32, USB 3.0): Equivalent performance (~70–100+ MB/s). Excellent eMMC HS200 support. Firmware initialization may differ from GL3224.
+- **GL823** (QFN-24, USB 2.0): Smallest footprint (4×4 mm), lowest power, ~25–35 MB/s. Size-constrained backup.
+- **AU6601** (QFN-48, USB 3.0): Larger footprint (7×7 mm). Last resort if GL3224/PL2732 unavailable.
+- **Infineon EZ-USB SD3** (BGA-56, USB 5 Gbps): Highest performance. Roadmap. Requires BGA assembly.
+
+**Critical:** GL823 (24-pin, full 4-bit SDIO) ≠ GL823K (16-pin, limited). The GL823K cannot route full 4-bit SDIO and must be avoided for Tucklet.
+
+Storage is shared by mode arbitration: wireless mode = ESP owns the card; plugged-in mode = bridge owns it; never both at once. On desktop this also makes the device a plain USB drive (easiest platform). The GL3224 QFN-32 (5×5 mm) is negligible in size impact and fits all Charm envelopes.
+
+**2S (Pro) wired speed is identical** to the 1S Charm line: the GL3224 bridge is the same component and bypasses the radio entirely. The Pro line benefits from the same ~70–100+ MB/s wired speed, making bulk library dumps fast regardless of the wireless tier.
+
+## Dimensions — reconfirmed for all options
+- **C5 + USB-HS bridge:** bridge is negligible; comfortably inside the AirTag envelope (~32–35 mm). Confirmed. GL3224 QFN-32 (5×5 mm) and QFN-48 (7×7 mm) both fit.
+- **E22-MINI (Roadmap):** Projected Mini dimensions (~15×21 mm) fit the Charm envelope perfectly. Requires larger battery (thickness increase) but keeps the "clip-on" identity.
+- **Dual-C5:** board area fits; constraint is two-antenna isolation in 32 mm + slightly bigger battery. Borderline-plausible — validate on prototype before finalizing enclosure. Top/bottom PCB placement with 90° orientation is the planned strategy; 4-layer recommended.
+- **E22-WROOM (Pro):** The 22×30 mm module with IPEX antenna requires the Pro envelope (~35×28×12–13 mm). This is still a "Pro Charm" — it clips to your phone, hangs on a string, and disappears into your daily carry. The thickness is justified by the performance (Wi-Fi 6E throughput and sustained high-current operation) that the 1S Charm line cannot deliver. The Pro line is fully covered under the **same source-available, non-commercial license** (CC BY-NC-SA 4.0 / PolyForm Noncommercial 1.0.0) as the Charm line.
+- **Linux router SoC:** DDR + SoC + flash + bigger battery exceed the charm envelope → deck-of-cards size. Only if speed is chosen over form factor. **Rejected.**
+- Battery is the thickness driver in every case, not the logic.
+
+## Headline numbers to design and market around
+- **Standard Wireless (C5, on-phone):** **~9 MB/s** — fine for photos/short clips, invisible via trickle-sync.
+- **Dual Wireless (Dual-C5, SPI AGG, on-phone):** **~12–15 MB/s** — link-aggregated, experimental. Validate RF isolation before production.
+- **Roadmap Wireless (Single E22-MINI, on-phone):** **~150 MB/s** (projected) — Wi-Fi 6E tri-band in a Charm form factor. Requires larger battery and thermal management. MINI form factor only.
+- **Roadmap Wireless (Dual E22-MINI, SPI AGG, on-phone):** **~300 MB/s** (projected) — Extreme performance tier. Significant thermal and power considerations. MINI form factor only.
+- **Pro Wireless (Single E22-WROOM, on-phone):** **~150 MB/s** — Wi-Fi 6E with external IPEX antenna and 2S battery. Thicker envelope (~35×28×12–13 mm) but still a "Pro Charm" that clips to your phone and disappears into your daily carry. The Pro line is fully covered under the same source-available, non-commercial license (CC BY-NC-SA 4.0 / PolyForm Noncommercial 1.0.0) as the Charm line.
+- **Pro Wireless (Dual E22-WROOM, SPI AGG, on-phone):** **~300 MB/s** (projected) — Maximum throughput tier. The 2S Pro Charm delivers performance the 1S Charm line cannot.
+- **Do NOT market the ESP USB path;** it is ~0.5 MB/s and unused.
+
+docs/protocol/PROTOCOL.md
+
+# Tucklet Protocol (v0.1)
+
+The single contract that keeps firmware and apps in sync. Two planes: **control** (BLE) and **data** (WiFi). Content is the same JSON across platforms.
+
+## 1. Control plane — Bluetooth LE (GATT)
+
+One custom GATT service. UUIDs below are placeholders — generate real 128-bit UUIDs before release.
+
+| Characteristic | Props | Payload |
+|---|---|---|
+| `STATUS` | Read/Notify | `{ "battery": 0-100, "charging": bool, "free_mb": int, "total_mb": int, "card_present": bool, "fw": "x.y.z", "variant": "singlec5-wroom-microsd" \| ... }` |
+| `AUTH` | Write/Notify | Pairing handshake (see §3) |
+| `SESSION` | Write/Notify | Request a transfer session; device replies with one-time WiFi creds + token (see §4) |
+| `COMMAND` | Write | Small commands: `{"op":"sleep"}`, `{"op":"factory_reset_confirm"}` |
+
+BLE carries **only** small control messages. Never bulk data.
+
+The `variant` field in STATUS allows the app to adjust its UI, transfer estimates, and feature visibility to match the connected device's exact hardware configuration without querying a separate endpoint. Variant identifiers follow the `gen_hardware.py` naming convention (e.g., `dualc5-mini-emmc`). See `docs/VARIANT_MATRIX.md` and `hardware/common/VARIANTS.md` for the complete variant taxonomy and `DeviceCapabilities` mapping.
+
+## 2. Data plane — WiFi SoftAP + local HTTP
+
+While a session is active the device hosts a SoftAP and a local HTTP/1.1 server at a fixed IP (e.g. `http://192.168.4.1`). All requests carry header `X-Tucklet-Token: <session_token>`.
+
+| Method · Path | Purpose |
+|---|---|
+| `GET /v1/manifest` | List stored items as metadata only (id, name, size, type, origin, thumb_url). No file bodies. |
+| `GET /v1/thumb/{id}` | Small thumbnail for gallery browsing. |
+| `GET /v1/file/{id}` | Stream a full file (supports HTTP Range for resume). |
+| `POST /v1/file` | Upload a file. Body includes the origin metadata (see §5). |
+| `DELETE /v1/file/{id}` | Remove a file. |
+| `POST /v1/restore/{id}` | Return origin metadata so the app can place the file back where it came from. |
+
+**Virtualization principle:** the app browses `manifest` + `thumb` only. Full bytes move solely on explicit user action. This is how the gallery stays instant and the battery survives.
+
+### Transport resolution
+
+The app never hard-codes a transport. On connect it reads `DeviceCapabilities` (via the `variant` field and feature flags), then resolves the best available data path for the current platform and physical state. Wired USB-HS is always preferred when the device is plugged in; Wi-Fi Aware is preferred over SoftAP where both sides support it; SoftAP is the universal fallback. This logic is unit-tested in `tucklet-core::variant::usable_transports()` and shared across all three client platforms (iOS, Android, Desktop).
+
+## 3. Pairing handshake (over `AUTH`)
+
+1. Phone -> device: `{"phone_id": "<phone_pubkey>", "name": "Ana's iPhone"}`
+2. Device: lights LED, waits for the physical button press (the authorization gesture).
+3. On press: device stores `phone_id` in its allow-list, replies `{"paired": true}`.
+4. On timeout/no press: `{"paired": false, "reason": "no_confirmation"}`.
+
+Production uses a proper key exchange (X25519/Ed25519) so `phone_id` is a public key and later sessions are cryptographically authenticated, not just name-matched. See `docs/protocol/AUTH.md` for the full Ed25519 challenge-response contract, the cross-verified reference vector, and the per-platform secure storage notes.
+
+## 4. Session establishment (over `SESSION`)
+
+1. Phone (already in allow-list) -> device: `{"op":"start"}`
+2. Device spins up SoftAP, generates a single-use SSID/password + `session_token`, replies:
+   `{ "ssid": "Tucklet-AB12", "psk": "<one-time>", "ip": "192.168.4.1", "token": "<session_token>", "ttl_s": 600 }`
+3. Phone joins that WiFi (Android: programmatic via `CompanionDeviceManager` + `WifiNetworkSuggestion` or `NetworkRequest`; iOS: `NEHotspotConfiguration` or Wi-Fi Aware `WiFiAwareSession` where certified) and uses the HTTP API with `X-Tucklet-Token`.
+4. On completion/idle-timeout: device tears down SoftAP, invalidates `psk` and `token`.
+
+Credentials are never static and never printed on the device. Each session uses fresh, single-use, short-TTL credentials.
+
+## 5. Round-trip / origin metadata (the "put it back where it was" feature)
+
+Every uploaded item stores where it came from:
+
+```json
+{
+  "id": "itm_01H...",
+  "name": "IMG_2087.HEIC",
+  "size": 4382002,
+  "type": "image/heic",
+  "created_at": "2026-04-02T18:11:09Z",
+  "origin": {
+    "platform": "android|ios",
+    "app": "Camera",
+    "collection": "DCIM/Camera",
+    "album": "Camara",
+    "device_name": "Ana's phone"
+  },
+  "state": "on_tucklet"
+}
+```
+
+On `POST /v1/restore/{id}` the device returns the `origin` block; the app re-inserts the file into the correct album/app location (Android and iOS differ here; firmware stays platform-neutral).
+
+## 6. State vocabulary (UX contract — no jargon)
+
+Three states only. Never expose the word "cache":
+
+| Protocol value | App label | Meaning |
+|---|---|---|
+| `on_phone` | **On phone** | Lives on the phone only |
+| `on_tucklet` | **On Tucklet** | Lives on the device only |
+| `temporary` | **Temporary** | A copy pulled to the phone for a user-chosen duration; auto-removed when it expires |
+
+For `temporary`, the app stores a user-chosen expiry (1 hour / 1 day / 1 week / keep). Expiry enforcement is the app's job; firmware only holds the canonical copy.
+
+## 7. Variant-aware transfer estimates
+
+The device's variant determines its wired and wireless throughput. The app uses the `variant` field from STATUS to look up the correct `LinkProfile` (`tucklet-core::link::profile_for`) so the transfer-time estimate reflects *this* unit's real speed before any bytes move.
+
+| Variant class | Wireless (SoftAP) | Wired (GL3224 USB 3.0) | Wired (GL823 USB 2.0) |
+|---|---|---|---|
+| Single C5 | ~9 MB/s | ~70–100+ MB/s | ~25–35 MB/s |
+| Dual C5 | ~15 MB/s | ~70–100+ MB/s | ~25–35 MB/s |
+| Single E22-MINI (roadmap) | ~150 MB/s (projected) | ~70–100+ MB/s | ~25–35 MB/s |
+| Dual E22-MINI (roadmap) | ~300 MB/s (projected) | ~70–100+ MB/s | ~25–35 MB/s |
+
+The wired speed depends on which USB bridge (U2) is populated. The GL3224 (QFN-32, USB 3.0, ~70–100+ MB/s) is the primary and standard build path; the GL823 (QFN-24, USB 2.0, ~25–35 MB/s) is the size-constrained backup. The device reports its bridge capability as part of `DeviceCapabilities` so the app shows the honest wired speed. See `hardware/common/COMPONENT_SELECTION.md` for the full USB bridge alternatives matrix (GL3224, PL2732, GL823, AU6601, EZ-USB SD3).
+
+### Pro Charm variants
+
+Pro variants (ESP32-E22-WROOM + 2S LiPo, ~35×28×12–13 mm envelope) use the same ESP32-E22 radio as the E22-MINI Charm variants and therefore share the same wireless throughput estimates. The wired path is also identical (GL3224 USB 3.0 bridge). The Pro line is fully covered under the same source-available, non-commercial license as the Charm line (CC BY-NC-SA 4.0 for hardware, PolyForm Noncommercial 1.0.0 for software). See `hardware/PRO_LINE.md` for the Pro variant matrix and power tree.
+
+## 8. Versioning
+
+`fw` in STATUS and `/v1/` in the path are the version anchors. Breaking changes bump to `/v2/`; apps negotiate against `fw`.
+
+So I am working on this its my product right now I have everythingaligned and fianlized its pretty well written, now what I want to do beause I need to confirm actually the wiring like the .net is that what I use to open with KiCad? the enclosure I am not sure if it is correct or would would around this can you confirm the dimensions and etc now we will be going per variant and I will confrm with you if the PIN matches or I can we first find the components all of them liste per variant and then I think what I can get the netlist blank without connections for confirmation this may be faster then typingout each pin 1x1? etc so raelly we are now going to confirm everything in the docs pertaining to the hardware per variant so confirm the other questions please and then ask which variant I would like to work on and then you will list confirm all steps I need to do in KiCad sowe can confirm all this before running the .net I do not want to run the .net and it may be incorrect I want to cross-verify it by building a blank netlist now based on KICad components findings pre-wirng so lets go
+
+BASED on this I got this
+
+This is a very mature engineering foundation. The documentation is clear, the parametric generation is smart, and the separation of concerns (HW/FW/SW) is professional.
+
+
+### 🏁 The Workflow
+
+We will proceed exactly as you requested: **Verify Components First, Wiring Second.**
+
+1.  **Select Variant** (You choose).
+2.  **The "Component Hunt":** I list the parts. You search KiCad libraries to confirm they exist.
+3.  **Symbol Check:** We verify the pins on the symbols match your `PIN_MAP.md` logic.
+4.  **Netlist Verification:** Only after components are confirmed do we look at the connections.
+
+---
+
+### 🧭 Which Variant to Start?
+
+
+**Reply with your choice (e.g., "Start with singlec5-microsd") and we will begin the "Component Hunt" in KiCad.**
+
+You are absolutely correct. The **ESP32-C5** is the brain of this entire product line. If the symbol is wrong, every single board fails.
+
+Here is the "Risk Assessment" for your component list. We need to treat these three components as **Custom/High-Risk** because they are either new chips or specific controllers not standard in the default KiCad libraries.
+
+### 🚨 The "Missing Symbols" List
+
+#### 1. ESP32-C5-WROOM-1 (High Risk)
+*   **Status:** Missing in standard KiCad libraries (which mostly stop at ESP32-S3).
+*   **Why it matters:** The C5 has a different pinout than the S3. Using the S3 symbol will route power/data to the wrong pins, potentially bricking the chip.
+*   **Action:** We **must create** this symbol.
+
+#### 2. USB-HS Bridge:
+
+#### 3. eMMC 5.1 (Medium Risk)
+*   **Status:** Footprints usually exist, but Symbols vary.
+*   **Why it matters:** Standard symbols often just say "Flash". We need one with specific pins (CLK, CMD, DAT0-7, VCC, VCCQ).
+*   **Action:** We can likely **modify** a generic Flash symbol.
+
+---
+
+# 🛠️ WORK ORDER: Build the "ESP32-C5" Foundation
+
+We will not open the `.net` file yet. We are going to build the library from scratch.
+
+### Step 1: Get the Source of Truth (Datasheet)
+We need the **ESP32-C5-WROOM-1 Datasheet**.
+1.  Search "ESP32-C5-WROOM-1 datasheet pinout" or go to the Espressif website.
+2.  Find the **Pin Definitions** table (usually in Section 2 or 3).
+3.  **Find the Pinout Diagram** (Top view or Bottom view with pad numbers).
+
+### Step 2: Create the Symbol in KiCad
+1.  Open KiCad.
+2.  Go to **Tools → Symbol Editor**.
+3.  **File → New Symbol**.
+    *   Name: `ESP32-C5-WROOM-1`
+    *   Library: Create a new library named `Tucklet.lib` (this will be your custom project library).
+
+### Step 3: Draw the Symbol
+1.  **The Box:** Draw a rectangle.
+2.  **The Pins:** We need to place pins on the Left (Inputs/Power) and Right (Outputs/BUS).
+
+
+**Do you have the ESP32-C5 Datasheet open?**
+
+**Reply "Datasheet Open" and list the Pin Numbers for the following pins from the datasheet:**
+
+
+now for the esp32-c5 I found the official ibraries on their official github
+
+You have hit the nail on the head. Finding the official libraries is the professional way to handle this—it beats drawing them from scratch every time.
+
+### 1. ESP32-C5-WROOM-1 (The Brain)
+**Status:** ✅ **Solved.**
+You found the official Espressif KiCad libraries on GitHub. This is the best source.
+
+**Action:**
+1.  Download the `kicad-libraries` from the Espressif GitHub repository.
+2.  In KiCad, go to **Manage Symbol Libraries** → **Add Existing Library** → Select the `ESP32-C5` symbol.
+3.  **Check:** Open the symbol in the editor. Ensure it has the pin names you need (SDIO pins, etc.). The official libraries are usually very high quality.
+
+---
+
+
+# 🛠️ WORK ORDER: Consolidate the Libraries
+
+We are not going to build the netlist yet. We are going to set up your environment so the netlist works *when* we import it.

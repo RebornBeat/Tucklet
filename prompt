@@ -11509,7 +11509,7 @@ Understood. The strategy is clear:
 
 Which file would you like to start with?
 
-now provide me the docs/assets/flow.svg provide it back to me in full whole complete without omission without dropping anything
+now provide me the Firmware/ARCHITECTURE.md provide it back to me in full whole complete without omission without dropping anything
 
 also we should be ensuring that we capture all alternative componinents per variant no? so we should then be creating subfolders in these per alternatives or I mean for the alternvaties/backup and standard paths to be organized properly so that we porperly have each design per each or net? and we should be noting that the E22 the mini and wroom variants the datasheets aren't released yet meaning we won't create folders for these yet but nothing that we will be implementing a E22 mini variant and the E22 vriant with 2S the pro version but for everythingelse everything else is released meaning we want to ensure we capture truly all variants and all paths organized standard/alternatives as well will be creating the designs for these all so should they all not be in their own subfolder per variant?
 now also the pro variants the pro version is going to be covered under our current licenses because even if it surpasses the airtag envelope it still fits within a charm envelope to be used as a charm and not a backpack so we need to capture this where applicable as well so again the pro is under the NC license and is a charm its the pro charm as its still charm sized even if thicker it is part of the source-available and non commercial license

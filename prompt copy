@@ -103,9 +103,9 @@ Here is the complete file list. **72 files**, no omissions:
 **Documentation**
 82. `docs/INDEX.md`
 83. `docs/FINAL_REVIEW.md`
-84. `docs/TRANSFER_PERFORMANCE.md`
-85. `docs/VARIANT_MATRIX.md`
-86. `docs/POWER_THERMAL.md`
+84. `docs/TRANSFER_PERFORMANCE.md` updated to update in propmt
+85. `docs/VARIANT_MATRIX.md` updated to update in prompt
+86. `docs/POWER_THERMAL.md` - updated to update in prompt as well as firmware/architecture.md
 87. `docs/UX_SPEC.md`
 88. `docs/PRIOR_ART_AND_LICENSE.md`
 

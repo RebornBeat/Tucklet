@@ -1,30 +1,30 @@
 ref,qty,value,mpn,footprint,unit_cost_usd,line_cost_usd,description,note
-U1,1,ESP32-C5-MINI-1,ESP32-C5-MINI-1,RF_Module:ESP32-S3-WROOM-1,2.40,2.40,Wi-Fi 6 dual-band + BLE module (radio/MCU),
-U2,1,GL3224 USB 3.0 SD Bridge,GL3224-OEM,Package_DFN_QFN:QFN-32,1.80,1.80,USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in,"Primary. USB 3.0 for ~70-100+ MB/s wired. QFN-32 single-LUN. Pin mapping must be verified from GL3224 datasheet. USB 3.0 SS pins may be NC in USB 2.0 fallback. Backup: GL823 (QFN-24, USB 2.0)."
-U3,1,BQ25896 Power-Path Charger,BQ25896,Package_DFN_QFN:WQFN-24_4x4mm,1.50,1.50,I2C USB buck charger with power-path; run radio while charging,"Primary. Power-path allows radio operation while charging. I2C controllable. Backup: MCP73831 (SOT-23-5, simple linear, no power-path)."
-U4,1,MAX17048,MAX17048G+T10,Package_DFN_QFN:TDFN-8-1EP_3x3mm,0.80,0.80,I2C fuel gauge (real battery percent),
-U5,1,3V3 buck (>=600mA),TPS62740-class,Package_TO_SOT_SMD:SOT-23-6,0.40,0.40,"Step-down regulator, sized for Wi-Fi TX peak",
-U6,1,SD 2:1 bus mux,TS3A-class 2:1,Package_DFN_QFN:QFN-20,0.45,0.45,Arbitrates microSD/eMMC bus between radio (A) and bridge (B),
-J1,1,USB-C receptacle,USB4105-GF-A-060 (or equiv),Connector_USB:USB_C_Receptacle_USB2.0_16P,0.30,0.30,Charge + wired data + CC,
+U1,1,ESP32-C5-MINI-1,ESP32-C5-MINI-1,RF_Module:ESP32-C5-MINI-1,2.40,2.40,Wi-Fi 6 dual-band + BLE module (radio/MCU),
+U2,1,GL3224-OIY04 USB 3.0 SD Bridge,GL3224-OEM,Package_DFN_QFN:QFN-32-EP_5x5mm,1.80,1.80,USB 3.0 High-Speed SD/eMMC bridge; owns storage when plugged in,"Primary. USB 3.0 for ~70-100+ MB/s wired. QFN-32 single-LUN. Pin mapping verified from finalized symbol. USB 3.0 SS pins may be NC in USB 2.0 fallback. Backup: GL823 (QFN-24, USB 2.0)."
+U3,1,BQ25896RTWT Power-Path Charger,BQ25896RTWT,Package_DFN_QFN:WQFN-24-EP_4x4mm,1.50,1.50,I2C USB buck charger with power-path; run radio while charging,"Primary. Power-path allows radio operation while charging. I2C controllable. Backup: MCP73831 (SOT-23-5, simple linear, no power-path)."
+U4,1,MAX17048G+T10,MAX17048G+T10,Package_DFN_QFN:TDFN-8-1EP_3x3mm,0.80,0.80,I2C fuel gauge (real battery percent),
+U5,1,SY8089AAC 3V3 buck,SY8089AAC,Package_TO_SOT_SMD:SOT-23-5,0.17,0.17,"Step-down regulator, sized for Wi-Fi TX peak",
+U6,1,TXS02612RTWR SD 2:1 bus mux,TXS02612RTWR,Package_DFN_QFN:WQFN-24-EP_4x4mm,0.70,0.70,Arbitrates microSD/eMMC bus between radio (B0) and bridge (B1),CRITICAL FIX. Replaces invalid QFN-20. 6-Channels required for SDIO 4-bit. Includes integrated pull-ups.
+J1,1,USB4105-GF-A-060 USB-C receptacle,USB4105-GF-A-060,Connector_USB:USB_C_Receptacle_USB2.0_16P,1.07,1.07,Charge + wired data + CC,
 D1,1,USB ESD array,USBLC6-2SC6,Package_TO_SOT_SMD:SOT-23-6,0.20,0.20,TVS protection on D+/D-/VBUS,
 R1,1,5.1k,RC0402FR-075K1L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,USB-C CC1 pulldown (sink role),
 R2,1,5.1k,RC0402FR-075K1L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,USB-C CC2 pulldown (sink role),
-R3,1,2k,RC0402FR-072KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,BQ25896 PROG (sets ~500mA charge; size to cell),
+R3,1,2k,RC0402FR-072KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,BQ25896 ILIM (sets input current limit),
 R4,1,4.7k,RC0402FR-074K7L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,I2C SDA pull-up,
 R5,1,4.7k,RC0402FR-074K7L,Resistor_SMD:R_0402_1005Metric,0.01,0.01,I2C SCL pull-up,
 R6,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,Button pull-up,
-SW1,1,tactile button,B3U-1000P,Button_Switch_SMD:SW_SPST_B3U-1000P,0.10,0.10,Pair / factory-reset (press patterns),
-LED1,1,WS2812B,WS2812B-2020,LED_SMD:LED_WS2812B_PLCC4_5.0x5.0mm,0.20,0.20,Addressable RGB status LED,
+SW1,1,B3U-1000P tactile button,B3U-1000P,Button_Switch_SMD:SW_SPST_B3U-1000P,0.18,0.18,Pair / factory-reset (press patterns),
+LED1,1,WS2812B-2020-V6,WS2812B-2020-V6,LED_SMD:LED_WS2812B-2020-V6,0.10,0.10,Addressable RGB status LED,
 R7,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_CMD pull-up,
 R8,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D0 pull-up,
 R9,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D1 pull-up,
 R10,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D2 pull-up,
 R11,1,10k,RC0402FR-0710KL,Resistor_SMD:R_0402_1005Metric,0.01,0.01,SD_D3 pull-up,
 XU7,1,eMMC 5.1 (capacity per SKU),KLMxGyFExA-class,Package_BGA:eMMC_153Ball_TFBGA_11.5x13mm,8.00,8.00,"Sealed managed NAND (JEDEC eMMC 5.1, 153-ball TFBGA)",capacity & cost set per SKU; 64GB shown as default
-BT1,1,LiPo 120-200mAh + PCM,cell + JST-ACH or solder pads,Connector:Conn_01x02_Pin,2.00,2.00,Single-cell LiPo with protection circuit,
+BT1,1,LiPo 120-200mAh + PCM,BM02B-ACHSS-GAN-ETF + cell,Connector:Conn_01x02_Pin,2.00,2.00,Single-cell LiPo with protection circuit,
 C_GRP,1,decoupling+bulk (grouped),,Capacitor_SMD:C_0402_1005Metric,0.50,0.50,100nF per IC rail + 10uF bulk near U1/U5 + USB/charger input caps,represented as a group; expand to individual C refs in KiCad
 PCB,1,2-4 layer board,,,1.50,1.50,"Small board, volume pricing",
 ENC,1,enclosure (3D-print early),,,2.00,2.00,32x24x8mm shell,molding tooling is separate capex
 
-TOTAL_ELECTRONICS,,,,,,18.76,,
-TOTAL_FULL_BOM,,,,,,22.26,eMMC cost is for 64GB; see SPEC for all capacities,
+TOTAL_ELECTRONICS,,,,,,19.53,,
+TOTAL_FULL_BOM,,,,,,23.03,eMMC cost is for 64GB; see SPEC for all capacities,
